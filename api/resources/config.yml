@@ -1,0 +1,21 @@
+port: 4000
+
+db:
+  dsn: "postgres://api_user:api_password@postgres:5432/api_db?sslmode=disable"
+  max_open_conns: 25
+  max_idle_conns: 25
+  max_idle_time: "15m"
+
+limiter:
+  rps: 2
+  burst: 4
+  enabled: true
+
+cors:
+  trusted_origins:
+    - "http://localhost:3000"
+    - "http://localhost:5173"
+    # Adicione aqui as origens que você confia
+
+security:
+  secret_key: "393ca3d65713c62156a1c96a435933088f15e3f1db1a3a6187dbc8d05796d257"
