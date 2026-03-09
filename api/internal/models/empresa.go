@@ -19,7 +19,6 @@ type Empresa struct {
 }
 
 type EmpresaDTO struct {
-	BaseModel
 	ID           *uuid.UUID
 	NomeFantasia *string `json:"nomeFantasia"`
 	RazaoSocial  *string `json:"razaoSocial"`
