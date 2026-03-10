@@ -46,7 +46,7 @@ type EmpresaRepository interface {
 		model *models.Empresa,
 	) error
 
-	Delete(tx *sql.Tx, id uuid.UUID) error
+	Delete(tx *sql.Tx, id, userID uuid.UUID) error
 }
 
 func parseUserConstraintError(err error) error {
@@ -193,16 +193,19 @@ func (r *empresaRepository) InsertOrUpdate(
 	)
 }
 
-func (r *empresaRepository) Delete(tx *sql.Tx, id uuid.UUID) error {
+func (r *empresaRepository) Delete(tx *sql.Tx, id, userID uuid.UUID) error {
 	query := `
 	UPDATE empresas set
 		deleted = true
+		updated_at = now()
+		updated_by = :userID
 	where 
 		id = :id
 	`
 
 	params := map[string]any{
-		"id": id,
+		"id":     id,
+		"userID": userID,
 	}
 
 	query, args := namedQuery(query, params)
