@@ -6,9 +6,14 @@ import (
 	"errors"
 	"maps"
 	"net/http"
+	"strings"
 )
 
 type Envelope map[string]any
+
+func MinifySQL(s string) string {
+	return strings.Join(strings.Fields(s), " ")
+}
 
 func WriteJSON(w http.ResponseWriter, status int, data any, headers http.Header) error {
 	js, err := json.MarshalIndent(data, "", "\t")

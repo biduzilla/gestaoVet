@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"gestaoVet/internal/jsonlog"
 	"gestaoVet/internal/models/filters"
 	e "gestaoVet/utils/errors"
 	"reflect"
@@ -14,7 +15,17 @@ import (
 	"github.com/lib/pq"
 )
 
-type repositories struct {
+type Repositories struct {
+	Empresa EmpresaRepository
+}
+
+func New(
+	db *sql.DB,
+	logger jsonlog.Logger,
+) *Repositories {
+	return &Repositories{
+		Empresa: NewEmpresaRepository(db, logger),
+	}
 }
 
 type FactoryFunc[T any] func() *T

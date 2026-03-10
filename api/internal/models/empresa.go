@@ -11,11 +11,11 @@ import (
 type Empresa struct {
 	BaseModel
 	ID           uuid.UUID `db:"id"`
-	nomeFantasia string    `db:"nome_fantasia"`
-	razaoSocial  string    `db:"razao_social"`
-	isAtivo      bool      `db:"is_ativo"`
-	cnpj         string    `db:"cnpj"`
-	email        string    `db:"email"`
+	NomeFantasia string    `db:"nome_fantasia"`
+	RazaoSocial  string    `db:"razao_social"`
+	IsAtivo      bool      `db:"is_ativo"`
+	Cnpj         string    `db:"cnpj"`
+	Email        string    `db:"email"`
 }
 
 type EmpresaDTO struct {
@@ -29,10 +29,10 @@ type EmpresaDTO struct {
 func (m Empresa) toDTO() *EmpresaDTO {
 	return &EmpresaDTO{
 		ID:           &m.ID,
-		NomeFantasia: &m.nomeFantasia,
-		RazaoSocial:  &m.razaoSocial,
-		Cnpj:         &m.cnpj,
-		Email:        &m.email,
+		NomeFantasia: &m.NomeFantasia,
+		RazaoSocial:  &m.RazaoSocial,
+		Cnpj:         &m.Cnpj,
+		Email:        &m.Email,
 	}
 }
 
@@ -44,36 +44,36 @@ func (d EmpresaDTO) toModel() *Empresa {
 	}
 
 	if d.NomeFantasia != nil {
-		model.nomeFantasia = *d.NomeFantasia
+		model.NomeFantasia = *d.NomeFantasia
 	}
 
 	if d.RazaoSocial != nil {
-		model.razaoSocial = *d.RazaoSocial
+		model.RazaoSocial = *d.RazaoSocial
 	}
 
 	if d.Cnpj != nil {
-		model.cnpj = *d.Cnpj
+		model.Cnpj = *d.Cnpj
 	}
 
 	if d.Email != nil {
-		model.email = *d.Email
+		model.Email = *d.Email
 	}
 
 	return &model
 }
 
 func (e *Empresa) Validate(v *validator.Validator) {
-	v.Check(e.nomeFantasia != "", "nome_fantasia", "must be provided")
-	v.Check(len(e.nomeFantasia) <= 100, "nome_fantasia", "must not be more than 100 characters long")
+	v.Check(e.NomeFantasia != "", "nome_fantasia", "must be provided")
+	v.Check(len(e.NomeFantasia) <= 100, "nome_fantasia", "must not be more than 100 characters long")
 
-	v.Check(e.razaoSocial != "", "razao_social", "must be provided")
-	v.Check(len(e.razaoSocial) <= 100, "razao_social", "must not be more than 100 characters long")
+	v.Check(e.RazaoSocial != "", "razao_social", "must be provided")
+	v.Check(len(e.RazaoSocial) <= 100, "razao_social", "must not be more than 100 characters long")
 
-	v.Check(e.cnpj != "", "cnpj", "must be provided")
-	v.Check(ValidateCNPJ(e.cnpj), "cnpj", "invalid CNPJ format or verification digits")
+	v.Check(e.Cnpj != "", "cnpj", "must be provided")
+	v.Check(ValidateCNPJ(e.Cnpj), "cnpj", "invalid CNPJ format or verification digits")
 
-	v.Check(e.email != "", "email", "must be provided")
-	v.Check(validator.Matches(e.email, validator.EmailRX), "email", "must be a valid email address")
+	v.Check(e.Email != "", "email", "must be provided")
+	v.Check(validator.Matches(e.Email, validator.EmailRX), "email", "must be a valid email address")
 
 }
 
