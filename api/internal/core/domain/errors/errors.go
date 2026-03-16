@@ -20,7 +20,7 @@ func NewErrorHandler(logger jsonlog.Logger) *errorHandler {
 	}
 }
 
-type ErrorHandlerInterface interface {
+type ErrorHandler interface {
 	NotPermittedResponse(w http.ResponseWriter, r *http.Request)
 	AuthenticationRequiredResponse(w http.ResponseWriter, r *http.Request)
 	InactiveAccountResponse(w http.ResponseWriter, r *http.Request)

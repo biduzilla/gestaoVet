@@ -1,0 +1,105 @@
+package empresa
+
+import (
+	"gestaoVet/internal/core/contexts"
+	"gestaoVet/internal/core/domain/errors"
+	"gestaoVet/internal/core/handler"
+	"gestaoVet/internal/core/validator"
+	"gestaoVet/utils"
+	"net/http"
+)
+
+type empresaHandler struct {
+	service    EmpresaService
+	errHandler errors.ErrorHandler
+}
+
+func NewHandler(
+	service EmpresaService,
+	errHandler errors.ErrorHandler,
+) *empresaHandler {
+	return &empresaHandler{
+		service:    service,
+		errHandler: errHandler,
+	}
+}
+
+func (h *empresaHandler) FindByID(w http.ResponseWriter, r *http.Request) {
+	id, ok := handler.ParseUUID(w, r, h.errHandler)
+	if !ok {
+		return
+	}
+
+	model, err := h.service.FindByID(id)
+	if err != nil {
+		h.errHandler.HandlerError(w, r, err, nil)
+		return
+	}
+
+	handler.Respond(
+		w, r,
+		http.StatusOK,
+		model.toDTO(),
+		nil,
+		h.errHandler,
+	)
+}
+
+func (h *empresaHandler) Save(w http.ResponseWriter, r *http.Request) {
+	var dto EmpresaDTO
+	if err := utils.ReadJSON(w, r, &dto); err != nil {
+		h.errHandler.BadRequestResponse(w, r, err)
+		return
+	}
+
+	v := validator.New()
+	model := dto.toModel()
+
+	if err := h.service.Save(model, v, nil); err != nil {
+		h.errHandler.HandlerError(w, r, err, v)
+		return
+	}
+
+	handler.Respond(w, r, http.StatusCreated, model.toDTO(), nil, h.errHandler)
+}
+
+func (h *empresaHandler) Update(w http.ResponseWriter, r *http.Request) {
+	var dto EmpresaDTO
+	if err := utils.ReadJSON(w, r, &dto); err != nil {
+		h.errHandler.BadRequestResponse(w, r, err)
+		return
+	}
+
+	v := validator.New()
+	user := contexts.ContextGetUser(r)
+	model := dto.toModel()
+
+	if err := h.service.Save(model, v, &user.ID); err != nil {
+		h.errHandler.HandlerError(w, r, err, v)
+		return
+	}
+
+	handler.Respond(w, r, http.StatusOK, model.toDTO(), nil, h.errHandler)
+}
+
+func (h *empresaHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, ok := handler.ParseUUID(w, r, h.errHandler)
+	if !ok {
+		return
+	}
+
+	user := contexts.ContextGetUser(r)
+	if err := h.service.Delete(id, user.ID); err != nil {
+		h.errHandler.HandlerError(w, r, err, nil)
+		return
+	}
+
+	handler.Respond(
+		w,
+		r,
+		http.StatusNoContent,
+		nil,
+		nil,
+		h.errHandler,
+	)
+}

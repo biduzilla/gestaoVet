@@ -8,6 +8,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"reflect"
 	"strings"
 )
 
@@ -30,6 +31,14 @@ func WriteJSON(w http.ResponseWriter, status int, data any, headers http.Header)
 	w.WriteHeader(status)
 	w.Write(js)
 	return nil
+}
+
+func GetTypeName(v any) string {
+	t := reflect.TypeOf(v)
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	return strings.ToLower(t.Name())
 }
 
 func ReadJSON(
