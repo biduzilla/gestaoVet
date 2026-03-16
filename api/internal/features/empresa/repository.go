@@ -43,6 +43,7 @@ type EmpresaRepository interface {
 	InsertOrUpdate(
 		tx *sql.Tx,
 		model *Empresa,
+		userID *uuid.UUID,
 	) error
 
 	Delete(tx *sql.Tx, id, userID uuid.UUID) error
@@ -139,6 +140,7 @@ func (r *empresaRepository) FindAll(
 func (r *empresaRepository) InsertOrUpdate(
 	tx *sql.Tx,
 	model *Empresa,
+	userID *uuid.UUID,
 ) error {
 	query := `
 	insert into empresas (
@@ -164,7 +166,7 @@ func (r *empresaRepository) InsertOrUpdate(
 		razao_social = excluded.razao_social,
 		email = excluded.email,
 		updated_at = now()
-		updated_by = empresas.id,
+		updated_by = :userID,
 		version = empresas.version + 1
 	returning
 		id,
@@ -177,6 +179,7 @@ func (r *empresaRepository) InsertOrUpdate(
 		"razaoSocial":  model.RazaoSocial,
 		"cnpj":         model.Cnpj,
 		"email":        model.Email,
+		"userID":       userID,
 	}
 
 	query, args := repository.NamedQuery(query, params)
