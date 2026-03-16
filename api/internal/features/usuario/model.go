@@ -1,20 +1,22 @@
 package usuario
 
 import (
+	"errors"
 	"gestaoVet/internal/core/domain/models"
 	"gestaoVet/internal/core/validator"
 	"regexp"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Usuario struct {
-	models.BaseModel
+	models.BaseModelCnpj
 	ID       uuid.UUID `db:"id"`
 	Nome     string    `db:"nome"`
 	Telefone string    `db:"telefone"`
 	Email    string    `db:"email"`
-	Senha    string    `db:"email"`
+	Senha    password  `db:"-"`
 	IsAtivo  bool      `db:"is_ativo"`
 }
 
@@ -27,6 +29,11 @@ type UsuarioDTO struct {
 	Senha    *string    `json:"-"`
 }
 
+type password struct {
+	Plaintext *string
+	Hash      []byte `db:"password_hash"`
+}
+
 func (m Usuario) ToDTO() *UsuarioDTO {
 	return &UsuarioDTO{
 		ID:       &m.ID,
@@ -36,7 +43,7 @@ func (m Usuario) ToDTO() *UsuarioDTO {
 	}
 }
 
-func (d UsuarioDTO) ToModel() *Usuario {
+func (d UsuarioDTO) ToModel() (*Usuario, error) {
 	var model Usuario
 
 	if d.ID != nil {
@@ -56,10 +63,13 @@ func (d UsuarioDTO) ToModel() *Usuario {
 	}
 
 	if d.Senha != nil {
-		model.Senha = *d.Senha
+		err := model.Senha.Set(*d.Senha)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return &model
+	return &model, nil
 }
 
 func (u *Usuario) Validate(v *validator.Validator) {
@@ -83,9 +93,26 @@ func ValidateTelefone(telefone string) bool {
 	}
 }
 
-func (u *Usuario) SetSenha() {
+func (p *password) Set(plaintextPassword string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(plaintextPassword), 12)
+	if err != nil {
+		return err
+	}
+
+	p.Plaintext = &plaintextPassword
+	p.Hash = hash
+	return nil
 }
 
-func (u *Usuario) CheckSenha() bool {
-	return true
+func (p *password) Matches(plaintextPassword string) (bool, error) {
+	err := bcrypt.CompareHashAndPassword(p.Hash, []byte(plaintextPassword))
+	if err != nil {
+		switch {
+		case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword):
+			return false, nil
+		default:
+			return false, err
+		}
+	}
+	return true, nil
 }

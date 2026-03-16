@@ -4,10 +4,12 @@ import (
 	"database/sql"
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/internal/features/empresa"
+	"gestaoVet/internal/features/usuario"
 )
 
 type Repositories struct {
 	Empresa empresa.EmpresaRepository
+	Usuario usuario.UsuarioRepository
 }
 
 func NewRepository(
@@ -16,5 +18,6 @@ func NewRepository(
 ) *Repositories {
 	return &Repositories{
 		Empresa: empresa.NewRepository(db, logger),
+		Usuario: usuario.NewRepository(db, logger),
 	}
 }
