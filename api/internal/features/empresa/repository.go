@@ -1,15 +1,14 @@
-package repositories
+package empresa
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
-	"gestaoVet/internal/jsonlog"
-	"gestaoVet/internal/models"
-	"gestaoVet/internal/models/filters"
+	"gestaoVet/internal/core/domain/errors"
+	"gestaoVet/internal/core/filters"
+	"gestaoVet/internal/core/jsonlog"
+	"gestaoVet/internal/core/repository"
 	"gestaoVet/utils"
-	"gestaoVet/utils/errors"
-	e "gestaoVet/utils/errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,7 +20,7 @@ type empresaRepository struct {
 	logger jsonlog.Logger
 }
 
-func NewEmpresaRepository(
+func NewRepository(
 	db *sql.DB,
 	logger jsonlog.Logger,
 ) *empresaRepository {
@@ -34,16 +33,16 @@ func NewEmpresaRepository(
 type EmpresaRepository interface {
 	FindByID(
 		ID uuid.UUID,
-	) (*models.Empresa, error)
+	) (*Empresa, error)
 
 	FindAll(
 		cnpj, nomeFantasia, razaoSocial, email string,
 		f filters.Filters,
-	) ([]*models.Empresa, filters.Metadata, error)
+	) ([]*Empresa, filters.Metadata, error)
 
 	InsertOrUpdate(
 		tx *sql.Tx,
-		model *models.Empresa,
+		model *Empresa,
 	) error
 
 	Delete(tx *sql.Tx, id, userID uuid.UUID) error
@@ -67,8 +66,8 @@ func parseUserConstraintError(err error) error {
 
 func (r *empresaRepository) FindByID(
 	ID uuid.UUID,
-) (*models.Empresa, error) {
-	cols := selectColumns(models.Empresa{}, "e")
+) (*Empresa, error) {
+	cols := repository.SelectColumns(Empresa{}, "e")
 	query := fmt.Sprintf(`
 		select
 			%s
@@ -82,17 +81,17 @@ func (r *empresaRepository) FindByID(
 		"id": ID,
 	}
 
-	query, args := namedQuery(query, params)
+	query, args := repository.NamedQuery(query, params)
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
 
-	return getByQuery[models.Empresa](r.db, query, args)
+	return repository.GetByQuery[Empresa](r.db, query, args)
 }
 
 func (r *empresaRepository) FindAll(
 	cnpj, nomeFantasia, razaoSocial, email string,
 	f filters.Filters,
-) ([]*models.Empresa, filters.Metadata, error) {
-	cols := selectColumns(models.Empresa{}, "e")
+) ([]*Empresa, filters.Metadata, error) {
+	cols := repository.SelectColumns(Empresa{}, "e")
 
 	query := fmt.Sprintf(`
 		select
@@ -123,23 +122,23 @@ func (r *empresaRepository) FindAll(
 		"offset":       f.Offset(),
 	}
 
-	query, args := namedQuery(query, params)
+	query, args := repository.NamedQuery(query, params)
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
 
-	return paginatedQuery(
+	return repository.PaginatedQuery(
 		r.db,
 		query,
 		args,
 		f,
-		func() *models.Empresa {
-			return &models.Empresa{}
+		func() *Empresa {
+			return &Empresa{}
 		},
 	)
 }
 
 func (r *empresaRepository) InsertOrUpdate(
 	tx *sql.Tx,
-	model *models.Empresa,
+	model *Empresa,
 ) error {
 	query := `
 	insert into empresas (
@@ -180,7 +179,7 @@ func (r *empresaRepository) InsertOrUpdate(
 		"email":        model.Email,
 	}
 
-	query, args := namedQuery(query, params)
+	query, args := repository.NamedQuery(query, params)
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -208,7 +207,7 @@ func (r *empresaRepository) Delete(tx *sql.Tx, id, userID uuid.UUID) error {
 		"userID": userID,
 	}
 
-	query, args := namedQuery(query, params)
+	query, args := repository.NamedQuery(query, params)
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -224,7 +223,7 @@ func (r *empresaRepository) Delete(tx *sql.Tx, id, userID uuid.UUID) error {
 	}
 
 	if rowsAffected == 0 {
-		return e.ErrRecordNotFound
+		return errors.ErrRecordNotFound
 	}
 
 	return nil

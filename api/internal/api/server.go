@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gestaoVet/internal/routes"
 	"log"
 	"net/http"
 	"os"
@@ -16,7 +15,7 @@ import (
 func (app *application) Server() error {
 	defer app.db.Close()
 
-	r := routes.NewRouter(
+	r := NewRouter(
 		app.db,
 		app.Logger,
 		app.config,

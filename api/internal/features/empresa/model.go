@@ -1,7 +1,8 @@
-package models
+package empresa
 
 import (
-	"gestaoVet/utils/validator"
+	"gestaoVet/internal/core/domain/models"
+	"gestaoVet/internal/core/validator"
 	"strconv"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 )
 
 type Empresa struct {
-	BaseModel
+	models.BaseModel
 	ID           uuid.UUID `db:"id"`
 	NomeFantasia string    `db:"nome_fantasia"`
 	RazaoSocial  string    `db:"razao_social"`
@@ -19,11 +20,11 @@ type Empresa struct {
 }
 
 type EmpresaDTO struct {
-	ID           *uuid.UUID
-	NomeFantasia *string `json:"nomeFantasia"`
-	RazaoSocial  *string `json:"razaoSocial"`
-	Cnpj         *string `json:"cnpj"`
-	Email        *string `json:"email"`
+	ID           *uuid.UUID `json:"id"`
+	NomeFantasia *string    `json:"nomeFantasia"`
+	RazaoSocial  *string    `json:"razaoSocial"`
+	Cnpj         *string    `json:"cnpj"`
+	Email        *string    `json:"email"`
 }
 
 func (m Empresa) toDTO() *EmpresaDTO {

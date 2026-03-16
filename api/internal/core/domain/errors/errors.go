@@ -3,9 +3,9 @@ package errors
 import (
 	"errors"
 	"fmt"
-	"gestaoVet/internal/jsonlog"
+	"gestaoVet/internal/core/jsonlog"
+	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
-	"gestaoVet/utils/validator"
 	"net/http"
 	"strings"
 )

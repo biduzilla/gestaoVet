@@ -1,24 +1,22 @@
-package services
+package empresa
 
 import (
 	"database/sql"
-	"gestaoVet/internal/models"
-	"gestaoVet/internal/models/filters"
-	"gestaoVet/internal/repositories"
+	"gestaoVet/internal/core/domain/errors"
+	"gestaoVet/internal/core/filters"
+	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
-	"gestaoVet/utils/errors"
-	"gestaoVet/utils/validator"
 
 	"github.com/google/uuid"
 )
 
 type empresaService struct {
-	repository repositories.EmpresaRepository
+	repository EmpresaRepository
 	db         *sql.DB
 }
 
-func NewEmpresaService(
-	repository repositories.EmpresaRepository,
+func NewService(
+	repository EmpresaRepository,
 	db *sql.DB,
 ) *empresaService {
 	return &empresaService{
@@ -31,20 +29,20 @@ type EmpresaService interface {
 	FindAll(
 		cnpj, nomeFantasia, razaoSocial, email string,
 		f filters.Filters,
-	) ([]*models.Empresa, filters.Metadata, error)
-	Save(model *models.Empresa, v *validator.Validator) error
-	FindByID(id uuid.UUID) (*models.Empresa, error)
+	) ([]*Empresa, filters.Metadata, error)
+	Save(model *Empresa, v *validator.Validator) error
+	FindByID(id uuid.UUID) (*Empresa, error)
 	Delete(id, userID uuid.UUID) error
 }
 
 func (s *empresaService) FindAll(
 	cnpj, nomeFantasia, razaoSocial, email string,
 	f filters.Filters,
-) ([]*models.Empresa, filters.Metadata, error) {
+) ([]*Empresa, filters.Metadata, error) {
 	return s.repository.FindAll(cnpj, nomeFantasia, razaoSocial, email, f)
 }
 
-func (s *empresaService) Save(model *models.Empresa, v *validator.Validator) error {
+func (s *empresaService) Save(model *Empresa, v *validator.Validator) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
 		if model.Validate(v); !v.Valid() {
 			return errors.ErrInvalidData
@@ -53,9 +51,11 @@ func (s *empresaService) Save(model *models.Empresa, v *validator.Validator) err
 		return s.repository.InsertOrUpdate(tx, model)
 	})
 }
-func (s *empresaService) FindByID(id uuid.UUID) (*models.Empresa, error) {
+
+func (s *empresaService) FindByID(id uuid.UUID) (*Empresa, error) {
 	return s.repository.FindByID(id)
 }
+
 func (s *empresaService) Delete(id, userID uuid.UUID) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
 		return s.repository.Delete(tx, id, userID)

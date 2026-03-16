@@ -1,9 +1,9 @@
-package routes
+package api
 
 import (
 	"database/sql"
-	"gestaoVet/internal/config"
-	"gestaoVet/internal/jsonlog"
+	"gestaoVet/internal/core/config"
+	"gestaoVet/internal/core/jsonlog"
 
 	"github.com/go-chi/chi"
 )

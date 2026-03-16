@@ -1,11 +1,11 @@
 package api
 
 import (
-	"context"
 	"database/sql"
 	"expvar"
-	"gestaoVet/internal/config"
-	"gestaoVet/internal/jsonlog"
+	"gestaoVet/internal/core/config"
+	"gestaoVet/internal/core/database"
+	"gestaoVet/internal/core/jsonlog"
 	"os"
 	"runtime"
 	"sync"
@@ -24,7 +24,7 @@ const version = "1.0.0"
 func NewApp(cfg config.Config) *application {
 	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 
-	db, err := openDB(cfg)
+	db, err := database.OpenDB(cfg)
 	if err != nil {
 		logger.PrintError(err, nil)
 		return nil
@@ -50,30 +50,4 @@ func NewApp(cfg config.Config) *application {
 		Logger: logger,
 		db:     db,
 	}
-}
-
-func openDB(cfg config.Config) (*sql.DB, error) {
-	db, err := sql.Open("postgres", cfg.DB.DSN)
-	if err != nil {
-		return nil, err
-	}
-
-	db.SetMaxOpenConns(cfg.DB.MaxOpenConns)
-	db.SetMaxIdleConns(cfg.DB.MaxIdleConns)
-
-	duration, err := time.ParseDuration(cfg.DB.MaxIdleTime)
-	if err != nil {
-		return nil, err
-	}
-	db.SetConnMaxIdleTime(duration)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = db.PingContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
 }

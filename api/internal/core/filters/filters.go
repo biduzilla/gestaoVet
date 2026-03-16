@@ -1,7 +1,7 @@
 package filters
 
 import (
-	"gestaoVet/utils/validator"
+	"gestaoVet/internal/core/validator"
 	"math"
 	"slices"
 	"strings"
