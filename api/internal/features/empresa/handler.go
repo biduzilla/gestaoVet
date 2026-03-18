@@ -108,7 +108,7 @@ func (h *empresaHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 
 func (h *empresaHandler) Save(w http.ResponseWriter, r *http.Request) {
 	var dto EmpresaDTO
-	if err := utils.ReadJSON(w, r, &dto); err != nil {
+	if err := handler.ReadJSON(w, r, &dto); err != nil {
 		h.errHandler.BadRequestResponse(w, r, err)
 		return
 	}
@@ -126,7 +126,7 @@ func (h *empresaHandler) Save(w http.ResponseWriter, r *http.Request) {
 
 func (h *empresaHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var dto EmpresaDTO
-	if err := utils.ReadJSON(w, r, &dto); err != nil {
+	if err := handler.ReadJSON(w, r, &dto); err != nil {
 		h.errHandler.BadRequestResponse(w, r, err)
 		return
 	}

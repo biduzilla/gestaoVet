@@ -27,12 +27,15 @@ func NewRouter(
 
 func (r *empresaRouter) Routes(router chi.Router) {
 	router.Route("/empresa", func(router chi.Router) {
-		router.Use(r.m.RequireActivatedUser)
-
-		router.Get("/{id}", r.handler.FindByID)
-		router.Get("/year", r.handler.FindByAll)
 		router.Post("/", r.handler.Save)
-		router.Put("/", r.handler.Update)
-		router.Delete("/{id}", r.handler.Delete)
+
+		router.Group(func(router chi.Router) {
+			router.Use(r.m.RequireActivatedUser)
+
+			router.Get("/{id}", r.handler.FindByID)
+			router.Get("/year", r.handler.FindByAll)
+			router.Put("/", r.handler.Update)
+			router.Delete("/{id}", r.handler.Delete)
+		})
 	})
 }

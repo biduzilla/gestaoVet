@@ -15,13 +15,21 @@ type authService struct {
 	config         config.Config
 }
 
+type TokenType string
+
+const (
+	TokenTypeAccess  TokenType = "access"
+	TokenTypeRefresh TokenType = "refresh"
+)
+
 type AuthService interface {
 	Login(
 		v *validator.Validator,
 		email, password string,
-	) (string, error)
+	) (string, string, error)
 
 	ExtractUsername(tokenString string) (string, error)
+	RefreshToken(refreshToken string) (string, error)
 }
 
 func NewService(
@@ -37,43 +45,49 @@ func NewService(
 func (s *authService) Login(
 	v *validator.Validator,
 	email, password string,
-) (string, error) {
+) (string, string, error) {
 	usuario.ValidatePasswordPlaintext(v, password)
 
 	if !v.Valid() {
-		return "", errors.ErrInvalidData
+		return "", "", errors.ErrInvalidData
 	}
 
 	user, err := s.usuarioService.FindByEmail(email, v)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if !user.IsAtivo {
-		return "", errors.ErrInactiveAccount
+		return "", "", errors.ErrInactiveAccount
 	}
 
 	match, err := user.Senha.Matches(password)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if !match {
-		return "", errors.ErrInvalidCredentials
+		return "", "", errors.ErrInvalidCredentials
 	}
 
-	token, err := s.createToken(user.Email)
+	token, err := s.createAccessToken(user.Email)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return token, nil
+	refreshToken, err := s.createRefreshToken(user.Email)
+	if err != nil {
+		return "", "", err
+	}
+
+	return token, refreshToken, nil
 }
 
-func (s *authService) createToken(username string) (string, error) {
+func (s *authService) createAccessToken(username string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
 			"username": username,
+			"type":     TokenTypeAccess,
 			"exp":      time.Now().Add(time.Hour * 24).Unix(),
 		})
 	tokenStr, err := token.SignedString([]byte(s.config.Security.SecretKey))
@@ -83,6 +97,17 @@ func (s *authService) createToken(username string) (string, error) {
 	}
 
 	return tokenStr, nil
+}
+
+func (s *authService) createRefreshToken(username string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
+		jwt.MapClaims{
+			"username": username,
+			"type":     TokenTypeRefresh,
+			"exp":      time.Now().Add(7 * 24 * time.Hour).Unix(),
+		})
+
+	return token.SignedString([]byte(s.config.Security.SecretKey))
 }
 
 func (s *authService) ExtractUsername(tokenString string) (string, error) {
@@ -109,4 +134,29 @@ func (s *authService) ExtractUsername(tokenString string) (string, error) {
 	}
 
 	return username, nil
+}
+
+func (s *authService) RefreshToken(refreshToken string) (string, error) {
+	token, err := jwt.Parse(refreshToken, func(t *jwt.Token) (any, error) {
+		return []byte(s.config.Security.SecretKey), nil
+	})
+	if err != nil || !token.Valid {
+		return "", errors.ErrInvalidCredentials
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.ErrInvalidCredentials
+	}
+
+	if claims["type"] != "refresh" {
+		return "", errors.ErrInvalidCredentials
+	}
+
+	username, ok := claims["username"].(string)
+	if !ok {
+		return "", errors.ErrInvalidCredentials
+	}
+
+	return s.createAccessToken(username)
 }

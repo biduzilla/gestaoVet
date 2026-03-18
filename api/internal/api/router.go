@@ -8,6 +8,7 @@ import (
 	"gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/internal/core/middleware"
+	"gestaoVet/internal/features/auth"
 	"gestaoVet/internal/features/empresa"
 	"net/http"
 
@@ -18,6 +19,7 @@ type Router struct {
 	errHandler errors.ErrorHandler
 	m          middleware.Middleware
 	empresa    empresa.EmpresaRouter
+	auth       auth.AuthRouter
 }
 
 func NewRouter(
@@ -39,6 +41,7 @@ func NewRouter(
 		m:          m,
 		errHandler: e,
 		empresa:    empresa.NewRouter(h.Empresa, m),
+		auth:       auth.NewRouter(h.Auth, m),
 	}
 }
 
