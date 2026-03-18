@@ -3,6 +3,7 @@ package empresa
 import (
 	"gestaoVet/internal/core/contexts"
 	"gestaoVet/internal/core/domain/errors"
+	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/handler"
 	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
@@ -22,6 +23,64 @@ func NewHandler(
 		service:    service,
 		errHandler: errHandler,
 	}
+}
+
+type EmpresaHandler interface {
+	FindByAll(w http.ResponseWriter, r *http.Request)
+	FindByID(w http.ResponseWriter, r *http.Request)
+	Save(w http.ResponseWriter, r *http.Request)
+	Update(w http.ResponseWriter, r *http.Request)
+	Delete(w http.ResponseWriter, r *http.Request)
+}
+
+func (h *empresaHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		cnpj,
+		nomeFantasia,
+		razaoSocial,
+		email string
+		filters.Filters
+	}
+
+	v := validator.New()
+	input.cnpj = handler.ReadStringParam(r, "cnpj", "")
+	input.nomeFantasia = handler.ReadStringParam(r, "nomeFantasia", "")
+	input.razaoSocial = handler.ReadStringParam(r, "razaoSocial", "")
+	input.email = handler.ReadStringParam(r, "email", "")
+
+	input.Filters.Page = handler.ReadIntParam(r, "page", 1, v)
+	input.Filters.PageSize = handler.ReadIntParam(r, "page_size", 20, v)
+	input.Filters.Sort = handler.ReadStringParam(r, "sort", "id")
+	input.Filters.SortSafelist = []string{"id", "name", "-id", "-name"}
+
+	models, metadata, err := h.service.FindAll(
+		input.cnpj,
+		input.nomeFantasia,
+		input.razaoSocial,
+		input.email,
+		input.Filters,
+	)
+	if err != nil {
+		h.errHandler.HandlerError(w, r, err, v)
+		return
+	}
+
+	dtos := make([]*EmpresaDTO, 0, len(models))
+	for _, m := range models {
+		dtos = append(dtos, m.toDTO())
+	}
+
+	handler.Respond(
+		w,
+		r,
+		http.StatusOK,
+		utils.Envelope{
+			utils.GetTypeName(dtos[0]): dtos,
+			"metadata":                 metadata,
+		},
+		nil,
+		h.errHandler,
+	)
 }
 
 func (h *empresaHandler) FindByID(w http.ResponseWriter, r *http.Request) {

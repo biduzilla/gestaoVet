@@ -20,6 +20,10 @@ type usuarioRepository struct {
 }
 
 type UsuarioRepository interface {
+	FindByEmail(
+		email string,
+	) (*Usuario, error)
+
 	FindByID(
 		ID uuid.UUID,
 		cnpj string,
@@ -52,6 +56,29 @@ func NewRepository(
 		db:     db,
 		logger: logger,
 	}
+}
+
+func (r *usuarioRepository) FindByEmail(
+	email string,
+) (*Usuario, error) {
+	cols := repository.SelectColumns(Usuario{}, "u")
+	query := fmt.Sprintf(`
+		select
+			%s
+		from usuarios u
+		where
+			u.email = :email
+			and u.deleted = false
+	`, cols)
+
+	params := map[string]any{
+		"email": email,
+	}
+
+	query, args := repository.NamedQuery(query, params)
+	r.logger.PrintInfo(utils.MinifySQL(query), nil)
+
+	return repository.GetByQuery[Usuario](r.db, query, args)
 }
 
 func (r *usuarioRepository) FindByID(

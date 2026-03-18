@@ -3,9 +3,12 @@ package handler
 import (
 	"fmt"
 	"gestaoVet/internal/core/domain/errors"
+	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
 	"net/http"
+	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/google/uuid"
@@ -43,6 +46,45 @@ func ParseUUID(
 	}
 
 	return uid, true
+}
+
+func ReadStringParam(r *http.Request, key, defaultValue string) string {
+	qs := r.URL.Query()
+	s := qs.Get(key)
+
+	if s == "" {
+		return defaultValue
+	}
+	return s
+}
+
+func ReadDate(qs url.Values, key string, layout string) *time.Time {
+	s := qs.Get(key)
+	if s == "" {
+		return nil
+	}
+
+	t, err := time.Parse(layout, s)
+	if err != nil {
+		return nil
+	}
+	return &t
+}
+
+func ReadIntParam(r *http.Request, key string, defaultValue int, v *validator.Validator) int {
+	qs := r.URL.Query()
+	s := qs.Get(key)
+
+	if s == "" {
+		return defaultValue
+	}
+
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		v.AddError(key, "must be an integer value")
+		return defaultValue
+	}
+	return i
 }
 
 func Respond(

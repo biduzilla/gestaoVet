@@ -16,6 +16,11 @@ type usuarioService struct {
 }
 
 type UsuarioService interface {
+	FindByEmail(
+		email string,
+		v *validator.Validator,
+	) (*Usuario, error)
+
 	FindByID(
 		ID uuid.UUID,
 		cnpj string,
@@ -48,6 +53,17 @@ func NewService(
 		repository: repository,
 		db:         db,
 	}
+}
+
+func (s *usuarioService) FindByEmail(
+	email string,
+	v *validator.Validator,
+) (*Usuario, error) {
+
+	if ValidateEmail(v, email); !v.Valid() {
+		return nil, errors.ErrInvalidData
+	}
+	return s.repository.FindByEmail(email)
 }
 
 func (s *usuarioService) FindByID(

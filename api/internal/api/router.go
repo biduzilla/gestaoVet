@@ -16,6 +16,8 @@ func NewRouter(
 	logger jsonlog.Logger,
 	config config.Config,
 ) *Router {
+	// e := errors.NewErrorHandler(logger)
+	// h := NewHandler(db, logger, e)
 	return &Router{}
 }
 
