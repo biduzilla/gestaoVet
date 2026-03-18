@@ -10,8 +10,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var AnonymousUser = &Usuario{}
-
 type Usuario struct {
 	models.BaseModelCnpj
 	ID       uuid.UUID `db:"id"`
@@ -32,7 +30,7 @@ type UsuarioDTO struct {
 }
 
 func (u *Usuario) IsAnonymous() bool {
-	return u == AnonymousUser
+	return false
 }
 
 type password struct {
@@ -40,7 +38,7 @@ type password struct {
 	Hash      []byte `db:"password_hash"`
 }
 
-func (m Usuario) ToDTO() *UsuarioDTO {
+func (m Usuario) toDTO() *UsuarioDTO {
 	return &UsuarioDTO{
 		ID:       &m.ID,
 		Nome:     &m.Nome,
@@ -49,7 +47,7 @@ func (m Usuario) ToDTO() *UsuarioDTO {
 	}
 }
 
-func (d UsuarioDTO) ToModel() (*Usuario, error) {
+func (d UsuarioDTO) toModel() (*Usuario, error) {
 	var model Usuario
 
 	if d.ID != nil {
@@ -132,4 +130,16 @@ func ValidatePasswordPlaintext(v *validator.Validator, password string) {
 	v.Check(password != "", "password", "must be provided")
 	v.Check(len(password) >= 8, "password", "must be at least 8 bytes long")
 	v.Check(len(password) <= 72, "password", "must not be more than 72 bytes long")
+}
+
+func (u *Usuario) GetID() uuid.UUID {
+	return u.ID
+}
+
+func (u *Usuario) GetCNPJ() string {
+	return u.Cnpj
+}
+
+func (u *Usuario) GetIsAtivo() bool {
+	return u.IsAtivo
 }

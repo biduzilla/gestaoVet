@@ -43,7 +43,7 @@ type EmpresaRepository interface {
 	InsertOrUpdate(
 		tx *sql.Tx,
 		model *Empresa,
-		userID *uuid.UUID,
+		userID uuid.UUID,
 	) error
 
 	Delete(tx *sql.Tx, id, userID uuid.UUID) error
@@ -140,7 +140,7 @@ func (r *empresaRepository) FindAll(
 func (r *empresaRepository) InsertOrUpdate(
 	tx *sql.Tx,
 	model *Empresa,
-	userID *uuid.UUID,
+	userID uuid.UUID,
 ) error {
 	query := `
 	insert into empresas (

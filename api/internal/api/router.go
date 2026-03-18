@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"expvar"
+	"gestaoVet/internal/core/adapter"
 	"gestaoVet/internal/core/config"
 	"gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/jsonlog"
@@ -28,9 +29,11 @@ func NewRouter(
 	h := NewHandler(db, logger, e, config)
 	m := middleware.New(
 		e,
-		h.Services.UsuarioService,
-		h.Services.AuthService,
 		config,
+		adapter.UserFinderAdapter{
+			Service: h.Services.UsuarioService,
+		},
+		h.Services.AuthService,
 	)
 	return &Router{
 		m:          m,

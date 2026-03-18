@@ -1,4 +1,4 @@
-package empresa
+package usuario
 
 import (
 	"gestaoVet/internal/core/contexts"
@@ -8,26 +8,14 @@ import (
 	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
 	"net/http"
-
-	"github.com/google/uuid"
 )
 
-type empresaHandler struct {
-	service    EmpresaService
+type usuarioHandler struct {
+	service    UsuarioService
 	errHandler errors.ErrorHandler
 }
 
-func NewHandler(
-	service EmpresaService,
-	errHandler errors.ErrorHandler,
-) *empresaHandler {
-	return &empresaHandler{
-		service:    service,
-		errHandler: errHandler,
-	}
-}
-
-type EmpresaHandler interface {
+type UsuarioHandler interface {
 	FindByAll(w http.ResponseWriter, r *http.Request)
 	FindByID(w http.ResponseWriter, r *http.Request)
 	Save(w http.ResponseWriter, r *http.Request)
@@ -35,19 +23,29 @@ type EmpresaHandler interface {
 	Delete(w http.ResponseWriter, r *http.Request)
 }
 
-func (h *empresaHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
+func NewHandler(
+	service UsuarioService,
+	errHandler errors.ErrorHandler,
+) *usuarioHandler {
+	return &usuarioHandler{
+		service:    service,
+		errHandler: errHandler,
+	}
+}
+
+func (h *usuarioHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		cnpj,
-		nomeFantasia,
-		razaoSocial,
-		email string
+		nome     string
+		telefone string
+		email    string
+		cnpj     string
 		filters.Filters
 	}
 
 	v := validator.New()
 	input.cnpj = handler.ReadStringParam(r, "cnpj", "")
-	input.nomeFantasia = handler.ReadStringParam(r, "nomeFantasia", "")
-	input.razaoSocial = handler.ReadStringParam(r, "razaoSocial", "")
+	input.telefone = handler.ReadStringParam(r, "telefone", "")
+	input.nome = handler.ReadStringParam(r, "nome", "")
 	input.email = handler.ReadStringParam(r, "email", "")
 
 	input.Filters.Page = handler.ReadIntParam(r, "page", 1, v)
@@ -56,10 +54,10 @@ func (h *empresaHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
 	input.Filters.SortSafelist = []string{"id", "nome", "-id", "-nome"}
 
 	models, metadata, err := h.service.FindAll(
-		input.cnpj,
-		input.nomeFantasia,
-		input.razaoSocial,
+		input.nome,
+		input.telefone,
 		input.email,
+		input.cnpj,
 		input.Filters,
 	)
 	if err != nil {
@@ -67,7 +65,7 @@ func (h *empresaHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dtos := make([]*EmpresaDTO, 0, len(models))
+	dtos := make([]*UsuarioDTO, 0, len(models))
 	for _, m := range models {
 		dtos = append(dtos, m.toDTO())
 	}
@@ -85,13 +83,14 @@ func (h *empresaHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-func (h *empresaHandler) FindByID(w http.ResponseWriter, r *http.Request) {
+func (h *usuarioHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 	id, ok := handler.ParseUUID(w, r, h.errHandler)
 	if !ok {
 		return
 	}
 
-	model, err := h.service.FindByID(id)
+	user := contexts.ContextGetUser(r)
+	model, err := h.service.FindByID(id, user.GetCNPJ())
 	if err != nil {
 		h.errHandler.HandlerError(w, r, err, nil)
 		return
@@ -106,17 +105,22 @@ func (h *empresaHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-func (h *empresaHandler) Save(w http.ResponseWriter, r *http.Request) {
-	var dto EmpresaDTO
+func (h *usuarioHandler) Save(w http.ResponseWriter, r *http.Request) {
+	var dto UsuarioDTO
 	if err := utils.ReadJSON(w, r, &dto); err != nil {
 		h.errHandler.BadRequestResponse(w, r, err)
 		return
 	}
 
 	v := validator.New()
-	model := dto.toModel()
+	user := contexts.ContextGetUser(r)
+	model, err := dto.toModel()
+	if err != nil {
+		h.errHandler.HandlerError(w, r, err, nil)
+		return
+	}
 
-	if err := h.service.Save(model, v, uuid.Nil); err != nil {
+	if err := h.service.Save(v, model, user.GetCNPJ(), user.GetID()); err != nil {
 		h.errHandler.HandlerError(w, r, err, v)
 		return
 	}
@@ -124,8 +128,8 @@ func (h *empresaHandler) Save(w http.ResponseWriter, r *http.Request) {
 	handler.Respond(w, r, http.StatusCreated, model.toDTO(), nil, h.errHandler)
 }
 
-func (h *empresaHandler) Update(w http.ResponseWriter, r *http.Request) {
-	var dto EmpresaDTO
+func (h *usuarioHandler) Update(w http.ResponseWriter, r *http.Request) {
+	var dto UsuarioDTO
 	if err := utils.ReadJSON(w, r, &dto); err != nil {
 		h.errHandler.BadRequestResponse(w, r, err)
 		return
@@ -133,9 +137,13 @@ func (h *empresaHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	v := validator.New()
 	user := contexts.ContextGetUser(r)
-	model := dto.toModel()
+	model, err := dto.toModel()
+	if err != nil {
+		h.errHandler.HandlerError(w, r, err, nil)
+		return
+	}
 
-	if err := h.service.Save(model, v, user.GetID()); err != nil {
+	if err := h.service.Save(v, model, user.GetCNPJ(), user.GetID()); err != nil {
 		h.errHandler.HandlerError(w, r, err, v)
 		return
 	}
@@ -143,14 +151,14 @@ func (h *empresaHandler) Update(w http.ResponseWriter, r *http.Request) {
 	handler.Respond(w, r, http.StatusOK, model.toDTO(), nil, h.errHandler)
 }
 
-func (h *empresaHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (h *usuarioHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, ok := handler.ParseUUID(w, r, h.errHandler)
 	if !ok {
 		return
 	}
 
 	user := contexts.ContextGetUser(r)
-	if err := h.service.Delete(id, user.GetID()); err != nil {
+	if err := h.service.Delete(id, user.GetID(), user.GetCNPJ()); err != nil {
 		h.errHandler.HandlerError(w, r, err, nil)
 		return
 	}

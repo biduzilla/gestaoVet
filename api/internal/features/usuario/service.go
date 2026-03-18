@@ -35,10 +35,10 @@ type UsuarioService interface {
 		v *validator.Validator,
 		model *Usuario,
 		cnpj string,
-		ID *uuid.UUID,
+		ID uuid.UUID,
 	) error
 
-	Delete(tx *sql.Tx,
+	Delete(
 		id,
 		userID uuid.UUID,
 		cnpj string,
@@ -84,7 +84,7 @@ func (s *usuarioService) Save(
 	v *validator.Validator,
 	model *Usuario,
 	cnpj string,
-	ID *uuid.UUID,
+	ID uuid.UUID,
 ) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
 		if model.Validate(v); !v.Valid() {
@@ -95,7 +95,7 @@ func (s *usuarioService) Save(
 	})
 }
 
-func (s *usuarioService) Delete(tx *sql.Tx,
+func (s *usuarioService) Delete(
 	id,
 	userID uuid.UUID,
 	cnpj string,

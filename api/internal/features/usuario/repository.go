@@ -38,7 +38,7 @@ type UsuarioRepository interface {
 		tx *sql.Tx,
 		model *Usuario,
 		cnpj string,
-		ID *uuid.UUID,
+		ID uuid.UUID,
 	) error
 
 	Delete(tx *sql.Tx,
@@ -161,7 +161,7 @@ func (r *usuarioRepository) InsertOrUpdate(
 	tx *sql.Tx,
 	model *Usuario,
 	cnpj string,
-	ID *uuid.UUID,
+	ID uuid.UUID,
 ) error {
 	query := `
 	insert into empresas (

@@ -6,9 +6,8 @@ import (
 	"gestaoVet/internal/core/config"
 	"gestaoVet/internal/core/contexts"
 	"gestaoVet/internal/core/domain/errors"
+	"gestaoVet/internal/core/interfaces"
 	"gestaoVet/internal/core/validator"
-	"gestaoVet/internal/features/auth"
-	"gestaoVet/internal/features/usuario"
 	"net"
 	"net/http"
 	"strconv"
@@ -26,11 +25,19 @@ var (
 	totalResponsesSentByStatus      = expvar.NewMap("total_responses_sent_by_status")
 )
 
+type UserFinder interface {
+	FindByEmail(email string, v *validator.Validator) (interfaces.User, error)
+}
+
+type JWTService interface {
+	ExtractUsername(tokenString string) (string, error)
+}
+
 type middleware struct {
-	errHandler  errors.ErrorHandler
-	userService usuario.UsuarioService
-	authService auth.AuthService
-	config      config.Config
+	errHandler errors.ErrorHandler
+	userFinder UserFinder
+	jwtService JWTService
+	config     config.Config
 }
 
 type Middleware interface {
@@ -45,15 +52,15 @@ type Middleware interface {
 
 func New(
 	errHandler errors.ErrorHandler,
-	userService usuario.UsuarioService,
-	authService auth.AuthService,
 	config config.Config,
+	userFinder UserFinder,
+	jwtService JWTService,
 ) *middleware {
 	return &middleware{
-		errHandler:  errHandler,
-		userService: userService,
-		authService: authService,
-		config:      config,
+		userFinder: userFinder,
+		jwtService: jwtService,
+		errHandler: errHandler,
+		config:     config,
 	}
 }
 
@@ -144,7 +151,7 @@ func (m *middleware) RequireAuthenticatedUser(next http.Handler) http.Handler {
 func (m *middleware) RequireActivatedUser(next http.Handler) http.Handler {
 	return m.RequireAuthenticatedUser(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := contexts.ContextGetUser(r)
-		if !user.IsAtivo {
+		if !user.GetIsAtivo() {
 			m.errHandler.InactiveAccountResponse(w, r)
 			return
 		}
@@ -158,7 +165,7 @@ func (m *middleware) Authenticate(next http.Handler) http.Handler {
 		authorizationHeader := r.Header.Get("Authorization")
 
 		if authorizationHeader == "" {
-			r = contexts.ContextSetUser(r, usuario.AnonymousUser)
+			r = contexts.ContextSetUser(r, interfaces.AnonymousUser)
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -170,14 +177,14 @@ func (m *middleware) Authenticate(next http.Handler) http.Handler {
 		}
 
 		token := headerParts[1]
-		username, err := m.authService.ExtractUsername(token)
+		username, err := m.jwtService.ExtractUsername(token)
 		if err != nil {
 			m.errHandler.InvalidAuthenticationTokenResponse(w, r)
 			return
 		}
 
 		v := validator.New()
-		user, err := m.userService.FindByEmail(username, v)
+		user, err := m.userFinder.FindByEmail(username, v)
 		if err != nil {
 			m.errHandler.HandlerError(w, r, err, v)
 			return
