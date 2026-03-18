@@ -26,14 +26,14 @@ var (
 	totalResponsesSentByStatus      = expvar.NewMap("total_responses_sent_by_status")
 )
 
-type Middleware struct {
+type middleware struct {
 	errHandler  errors.ErrorHandler
 	userService usuario.UsuarioService
 	authService auth.AuthService
 	config      config.Config
 }
 
-type MiddlewareInterface interface {
+type Middleware interface {
 	Metrics(next http.Handler) http.Handler
 	EnableCORS(next http.Handler) http.Handler
 	RequireAuthenticatedUser(next http.Handler) http.Handler
@@ -48,8 +48,8 @@ func New(
 	userService usuario.UsuarioService,
 	authService auth.AuthService,
 	config config.Config,
-) *Middleware {
-	return &Middleware{
+) *middleware {
+	return &middleware{
 		errHandler:  errHandler,
 		userService: userService,
 		authService: authService,
@@ -91,7 +91,7 @@ func (mw *metricsResponseWriter) Unwrap() http.ResponseWriter {
 	return mw.wrapped
 }
 
-func (m *Middleware) Metrics(next http.Handler) http.Handler {
+func (m *middleware) Metrics(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		totalRequestsReceived.Add(1)
@@ -107,7 +107,7 @@ func (m *Middleware) Metrics(next http.Handler) http.Handler {
 	})
 }
 
-func (m *Middleware) EnableCORS(next http.Handler) http.Handler {
+func (m *middleware) EnableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Origin")
 		w.Header().Add("Vary", "Access-Control-Request-Method")
@@ -130,7 +130,7 @@ func (m *Middleware) EnableCORS(next http.Handler) http.Handler {
 	})
 }
 
-func (m *Middleware) RequireAuthenticatedUser(next http.Handler) http.Handler {
+func (m *middleware) RequireAuthenticatedUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := contexts.ContextGetUser(r)
 		if user.IsAnonymous() {
@@ -141,7 +141,7 @@ func (m *Middleware) RequireAuthenticatedUser(next http.Handler) http.Handler {
 	})
 }
 
-func (m *Middleware) RequireActivatedUser(next http.Handler) http.Handler {
+func (m *middleware) RequireActivatedUser(next http.Handler) http.Handler {
 	return m.RequireAuthenticatedUser(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := contexts.ContextGetUser(r)
 		if !user.IsAtivo {
@@ -152,7 +152,7 @@ func (m *Middleware) RequireActivatedUser(next http.Handler) http.Handler {
 	}))
 }
 
-func (m *Middleware) Authenticate(next http.Handler) http.Handler {
+func (m *middleware) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Authorization")
 		authorizationHeader := r.Header.Get("Authorization")
@@ -188,7 +188,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
-func (m *Middleware) RateLimit(next http.Handler) http.Handler {
+func (m *middleware) RateLimit(next http.Handler) http.Handler {
 	type client struct {
 		limiter  *rate.Limiter
 		lastSeen time.Time
@@ -241,7 +241,7 @@ func (m *Middleware) RateLimit(next http.Handler) http.Handler {
 	})
 }
 
-func (m *Middleware) RecoverPanic(next http.Handler) http.Handler {
+func (m *middleware) RecoverPanic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
