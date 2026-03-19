@@ -10,6 +10,7 @@ import (
 	"gestaoVet/internal/core/middleware"
 	"gestaoVet/internal/features/auth"
 	"gestaoVet/internal/features/empresa"
+	"gestaoVet/internal/features/usuario"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -20,6 +21,7 @@ type Router struct {
 	m          middleware.Middleware
 	empresa    empresa.EmpresaRouter
 	auth       auth.AuthRouter
+	usuario    usuario.UsuarioRouter
 }
 
 func NewRouter(
@@ -42,6 +44,7 @@ func NewRouter(
 		errHandler: e,
 		empresa:    empresa.NewRouter(h.Empresa, m),
 		auth:       auth.NewRouter(h.Auth, m),
+		usuario:    usuario.NewRouter(h.Usuario, m),
 	}
 }
 
@@ -64,6 +67,8 @@ func (router *Router) RegisterRoutes() *chi.Mux {
 	r.Route("/v1", func(r chi.Router) {
 		r.Mount("/debug/vars", expvar.Handler())
 		router.empresa.Routes(r)
+		router.auth.Routes(r)
+		router.usuario.Routes(r)
 	})
 
 	return r

@@ -31,6 +31,20 @@ func ParseIntID(
 	return id, true
 }
 
+func ParseStringField(
+	w http.ResponseWriter,
+	r *http.Request,
+	errRsp e.ErrorHandler,
+	field string,
+) (string, bool) {
+	value, err := readStringPathVariable(r, "field")
+	if err != nil {
+		errRsp.BadRequestResponse(w, r, err)
+		return "", false
+	}
+	return value, true
+}
+
 func ParseUUID(
 	w http.ResponseWriter,
 	r *http.Request,

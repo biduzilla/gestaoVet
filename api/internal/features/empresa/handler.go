@@ -29,7 +29,7 @@ func NewHandler(
 
 type EmpresaHandler interface {
 	FindByAll(w http.ResponseWriter, r *http.Request)
-	FindByID(w http.ResponseWriter, r *http.Request)
+	FindByCnpj(w http.ResponseWriter, r *http.Request)
 	Save(w http.ResponseWriter, r *http.Request)
 	Update(w http.ResponseWriter, r *http.Request)
 	Delete(w http.ResponseWriter, r *http.Request)
@@ -85,13 +85,13 @@ func (h *empresaHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-func (h *empresaHandler) FindByID(w http.ResponseWriter, r *http.Request) {
-	id, ok := handler.ParseUUID(w, r, h.errHandler)
+func (h *empresaHandler) FindByCnpj(w http.ResponseWriter, r *http.Request) {
+	cnpj, ok := handler.ParseStringField(w, r, h.errHandler, "cnpj")
 	if !ok {
 		return
 	}
 
-	model, err := h.service.FindByID(id)
+	model, err := h.service.FindByCnpj(cnpj)
 	if err != nil {
 		h.errHandler.HandlerError(w, r, err, nil)
 		return
@@ -144,13 +144,13 @@ func (h *empresaHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *empresaHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, ok := handler.ParseUUID(w, r, h.errHandler)
+	cnpj, ok := handler.ParseStringField(w, r, h.errHandler, "cnpj")
 	if !ok {
 		return
 	}
 
 	user := contexts.ContextGetUser(r)
-	if err := h.service.Delete(id, user.GetID()); err != nil {
+	if err := h.service.Delete(cnpj, user.GetID()); err != nil {
 		h.errHandler.HandlerError(w, r, err, nil)
 		return
 	}

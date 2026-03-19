@@ -32,8 +32,8 @@ func (r *empresaRouter) Routes(router chi.Router) {
 		router.Group(func(router chi.Router) {
 			router.Use(r.m.RequireActivatedUser)
 
-			router.Get("/{id}", r.handler.FindByID)
-			router.Get("/year", r.handler.FindByAll)
+			router.Get("/{cnpj}", r.handler.FindByCnpj)
+			router.Get("/", r.handler.FindByAll)
 			router.Put("/", r.handler.Update)
 			router.Delete("/{id}", r.handler.Delete)
 		})

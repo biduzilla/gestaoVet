@@ -31,8 +31,8 @@ type EmpresaService interface {
 		f filters.Filters,
 	) ([]*Empresa, filters.Metadata, error)
 	Save(model *Empresa, v *validator.Validator, userID uuid.UUID) error
-	FindByID(id uuid.UUID) (*Empresa, error)
-	Delete(id, userID uuid.UUID) error
+	FindByCnpj(cnpj string) (*Empresa, error)
+	Delete(cnpj string, userID uuid.UUID) error
 }
 
 func (s *empresaService) FindAll(
@@ -52,12 +52,12 @@ func (s *empresaService) Save(model *Empresa, v *validator.Validator, userID uui
 	})
 }
 
-func (s *empresaService) FindByID(id uuid.UUID) (*Empresa, error) {
-	return s.repository.FindByID(id)
+func (s *empresaService) FindByCnpj(cnpj string) (*Empresa, error) {
+	return s.repository.FindByCnpj(cnpj)
 }
 
-func (s *empresaService) Delete(id, userID uuid.UUID) error {
+func (s *empresaService) Delete(cnpj string, userID uuid.UUID) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
-		return s.repository.Delete(tx, id, userID)
+		return s.repository.Delete(tx, cnpj, userID)
 	})
 }

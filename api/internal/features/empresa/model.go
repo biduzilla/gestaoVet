@@ -5,44 +5,35 @@ import (
 	"gestaoVet/internal/core/validator"
 	"strconv"
 	"strings"
-
-	"github.com/google/uuid"
 )
 
 type Empresa struct {
 	models.BaseModel
-	ID           uuid.UUID `db:"id"`
-	NomeFantasia string    `db:"nome_fantasia"`
-	RazaoSocial  string    `db:"razao_social"`
-	IsAtivo      bool      `db:"is_ativo"`
-	Cnpj         string    `db:"cnpj"`
-	Email        string    `db:"email"`
+	Cnpj         string `db:"cnpj"`
+	NomeFantasia string `db:"nome_fantasia"`
+	RazaoSocial  string `db:"razao_social"`
+	IsAtivo      bool   `db:"is_ativo"`
+	Email        string `db:"email"`
 }
 
 type EmpresaDTO struct {
-	ID           *uuid.UUID `json:"id"`
-	NomeFantasia *string    `json:"nomeFantasia"`
-	RazaoSocial  *string    `json:"razaoSocial"`
-	Cnpj         *string    `json:"cnpj"`
-	Email        *string    `json:"email"`
+	NomeFantasia *string `json:"nomeFantasia"`
+	RazaoSocial  *string `json:"razaoSocial"`
+	Cnpj         *string `json:"cnpj"`
+	Email        *string `json:"email"`
 }
 
 func (m Empresa) toDTO() *EmpresaDTO {
 	return &EmpresaDTO{
-		ID:           &m.ID,
+		Cnpj:         &m.Cnpj,
 		NomeFantasia: &m.NomeFantasia,
 		RazaoSocial:  &m.RazaoSocial,
-		Cnpj:         &m.Cnpj,
 		Email:        &m.Email,
 	}
 }
 
 func (d EmpresaDTO) toModel() *Empresa {
 	var model Empresa
-
-	if d.ID != nil {
-		model.ID = *d.ID
-	}
 
 	if d.NomeFantasia != nil {
 		model.NomeFantasia = *d.NomeFantasia

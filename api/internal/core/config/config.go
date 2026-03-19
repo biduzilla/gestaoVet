@@ -1,44 +1,76 @@
 package config
 
 import (
-	"os"
+	"log"
 
-	"gopkg.in/yaml.v3"
+	"github.com/joeshaw/envdecode"
 )
 
 type Config struct {
-	Port int `yaml:"port"`
+	Port int
+	Env  string
 	DB   struct {
-		DSN          string `yaml:"dsn"`
-		MaxOpenConns int    `yaml:"max_open_conns"`
-		MaxIdleConns int    `yaml:"max_idle_conns"`
-		MaxIdleTime  string `yaml:"max_idle_time"`
-	} `yaml:"db"`
+		DSN          string
+		MaxOpenConns int
+		MaxIdleConns int
+		MaxIdleTime  string
+	}
 	Limiter struct {
-		RPS     float64 `yaml:"rps"`
-		Burst   int     `yaml:"burst"`
-		Enabled bool    `yaml:"enabled"`
-	} `yaml:"limiter"`
+		RPS     float64
+		Burst   int
+		Enabled bool
+	}
 	CORS struct {
-		TrustedOrigins []string `yaml:"trusted_origins"`
-	} `yaml:"cors"`
+		TrustedOrigins []string
+	}
 	Security struct {
-		SecretKey string `yaml:"secret_key"`
-	} `yaml:"security"`
+		SecretKey string
+	}
 }
 
-func Load() (*Config, error) {
-	data, err := os.ReadFile("resource/config.yml")
-	if err != nil {
-		return nil, err
+type Conf struct {
+	Server      ConfServer
+	DB          ConfDB
+	RateLimiter ConfRL
+	Security    ConfSecurity
+}
+
+type ConfServer struct {
+	Port  int  `env:"SERVER_PORT,required"`
+	Debug bool `env:"SERVER_DEBUG,required"`
+}
+
+type ConfDB struct {
+	DSN          string `env:"DB_DSN,required"`
+	MaxOpenConns int    `env:"DB_MAX_OPEN_CONNS,required"`
+	MaxIdleConns int    `env:"DB_MAX_IDLE_CONNS,required"`
+	MaxIdleTime  string `env:"DB_MAX_IDLE_TIME,required"`
+}
+
+type ConfRL struct {
+	RPS     float64 `env:"LIMITER_RPS,required"`
+	Burst   int     `env:"LIMITER_BURST,required"`
+	Enabled bool    `env:"LIMITER_ENABLED,required"`
+}
+
+type ConfSecurity struct {
+	SecretKey string `env:"SECRET_KEY,required"`
+}
+
+func New() *Conf {
+	var c Conf
+	if err := envdecode.StrictDecode(&c); err != nil {
+		log.Fatalf("Failed to decode: %s", err)
 	}
 
-	var config Config
+	return &c
+}
 
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		return nil, err
+func NewDB() *ConfDB {
+	var c ConfDB
+	if err := envdecode.StrictDecode(&c); err != nil {
+		log.Fatalf("Failed to decode: %s", err)
 	}
 
-	return &config, err
+	return &c
 }

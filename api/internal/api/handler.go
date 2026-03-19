@@ -7,12 +7,14 @@ import (
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/internal/features/auth"
 	"gestaoVet/internal/features/empresa"
+	"gestaoVet/internal/features/usuario"
 )
 
 type handlers struct {
 	Services *Services
 	Empresa  empresa.EmpresaHandler
 	Auth     auth.AuthHandler
+	Usuario  usuario.UsuarioHandler
 }
 
 func NewHandler(
@@ -26,5 +28,6 @@ func NewHandler(
 		Services: s,
 		Empresa:  empresa.NewHandler(s.EmpresaService, errHandler),
 		Auth:     auth.NewHandler(s.AuthService, errHandler),
+		Usuario:  usuario.NewHandler(s.UsuarioService, errHandler),
 	}
 }

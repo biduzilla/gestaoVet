@@ -3,8 +3,9 @@ package empresa
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"gestaoVet/internal/core/domain/errors"
+	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/internal/core/repository"
@@ -31,8 +32,8 @@ func NewRepository(
 }
 
 type EmpresaRepository interface {
-	FindByID(
-		ID uuid.UUID,
+	FindByCnpj(
+		cnpj string,
 	) (*Empresa, error)
 
 	FindAll(
@@ -46,27 +47,25 @@ type EmpresaRepository interface {
 		userID uuid.UUID,
 	) error
 
-	Delete(tx *sql.Tx, id, userID uuid.UUID) error
+	Delete(tx *sql.Tx, cnpj string, userID uuid.UUID) error
 }
 
-func parseUserConstraintError(err error) error {
+func parseEmpresaConstraintError(err error) error {
 	if pqErr, ok := err.(*pq.Error); ok {
 		switch pqErr.Constraint {
 		case "empresas_email_key":
-			return errors.ValidationAlreadyExists("email")
+			return e.ValidationAlreadyExists("email")
 		case "empresas_razao_social_key":
-			return errors.ValidationAlreadyExists("razao_social")
+			return e.ValidationAlreadyExists("razao_social")
 		case "empresas_nome_fantasia_key":
-			return errors.ValidationAlreadyExists("nome_fantasia")
-		case "empresas_cnpj_key":
-			return errors.ValidationAlreadyExists("cnpj")
+			return e.ValidationAlreadyExists("nome_fantasia")
 		}
 	}
 	return err
 }
 
-func (r *empresaRepository) FindByID(
-	ID uuid.UUID,
+func (r *empresaRepository) FindByCnpj(
+	cnpj string,
 ) (*Empresa, error) {
 	cols := repository.SelectColumns(Empresa{}, "e")
 	query := fmt.Sprintf(`
@@ -74,12 +73,12 @@ func (r *empresaRepository) FindByID(
 			%s
 		from empresas e
 		where
-			e.id = :id
+			e.cnpj = :cnpj
 			and deleted = false
 	`, cols)
 
 	params := map[string]any{
-		"id": ID,
+		"cnpj": cnpj,
 	}
 
 	query, args := repository.NamedQuery(query, params)
@@ -104,7 +103,7 @@ func (r *empresaRepository) FindAll(
             (to_tsvector('simple', e.nomeFantasia) @@ plainto_tsquery('simple', :nomeFantasia) OR :nomeFantasia = '')
             (to_tsvector('simple', e.razaoSocial) @@ plainto_tsquery('simple', :razaoSocial) OR :razaoSocial = '')
             (to_tsvector('simple', e.email) @@ plainto_tsquery('simple', :email) OR :email = '')
-			where e.deleted = false
+			and e.deleted = false
 		ORDER BY
             e.%s %s,
             e.id ASC
@@ -144,34 +143,28 @@ func (r *empresaRepository) InsertOrUpdate(
 ) error {
 	query := `
 	insert into empresas (
+		cnpj,
 		nome_fantasia,
 		razao_social,
-		cnpj,
-		email,
+		email
 	)
 	values (
+		:cnpj,
 		:nomeFantasia,
 		:razaoSocial,
-		:cnpj,
 		:email
 	)
-	on conflict (
-		nome_fantasia,
-		razao_social,
-		cnpj,
-		email
-	) where deleted = false
+	on conflict (cnpj) where deleted = false
 	do update set
 		nome_fantasia = excluded.nome_fantasia,
 		razao_social = excluded.razao_social,
 		email = excluded.email,
-		updated_at = now()
+		updated_at = now(),
 		updated_by = :userID,
 		version = empresas.version + 1
 	returning
-		id,
 		created_at,
-		version,
+		version
 	`
 
 	params := map[string]any{
@@ -188,25 +181,33 @@ func (r *empresaRepository) InsertOrUpdate(
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	return tx.QueryRowContext(ctx, query, args...).Scan(
-		&model.ID,
+	err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&model.CreatedAt,
 		&model.Version,
 	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return e.ErrEditConflict
+		}
+
+		return parseEmpresaConstraintError(err)
+	}
+
+	return nil
 }
 
-func (r *empresaRepository) Delete(tx *sql.Tx, id, userID uuid.UUID) error {
+func (r *empresaRepository) Delete(tx *sql.Tx, cnpj string, userID uuid.UUID) error {
 	query := `
 	UPDATE empresas set
 		deleted = true
 		updated_at = now()
 		updated_by = :userID
 	where 
-		id = :id
+		cnpj = :cnpj
 	`
 
 	params := map[string]any{
-		"id":     id,
+		"cnpj":   cnpj,
 		"userID": userID,
 	}
 
@@ -226,7 +227,7 @@ func (r *empresaRepository) Delete(tx *sql.Tx, id, userID uuid.UUID) error {
 	}
 
 	if rowsAffected == 0 {
-		return errors.ErrRecordNotFound
+		return e.ErrRecordNotFound
 	}
 
 	return nil

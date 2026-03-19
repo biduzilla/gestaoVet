@@ -3,8 +3,9 @@ package usuario
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"gestaoVet/internal/core/domain/errors"
+	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/internal/core/repository"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type usuarioRepository struct {
@@ -56,6 +58,20 @@ func NewRepository(
 		db:     db,
 		logger: logger,
 	}
+}
+
+func parseUserConstraintError(err error) error {
+	if pqErr, ok := err.(*pq.Error); ok {
+		switch pqErr.Constraint {
+		case "user_email_key":
+			return e.ValidationAlreadyExists("email")
+		case "user_telefone_key":
+			return e.ValidationAlreadyExists("telefone")
+		case "usuarios_cnpj_fkey":
+			return e.ErrCnpjNotFound
+		}
+	}
+	return err
 }
 
 func (r *usuarioRepository) FindByEmail(
@@ -164,11 +180,11 @@ func (r *usuarioRepository) InsertOrUpdate(
 	ID uuid.UUID,
 ) error {
 	query := `
-	insert into empresas (
+	insert into usuarios (
 		nome,
 		telefone,
 		email,
-		senha,
+		password_hash,
 		cnpj
 	)
 	values (
@@ -178,33 +194,36 @@ func (r *usuarioRepository) InsertOrUpdate(
 		:senha,
 		:cnpj
 	)
-	on conflict (
-		nome,
-		telefone,
-		email,
-	) where deleted = false
+	on conflict (email) where deleted = false
 	do update set
 		nome = excluded.nome,
 		telefone = excluded.telefone,
 		email = excluded.email,
-		updated_at = now()
+		updated_at = now(),
 		updated_by = :ID,
-		version = empresas.version + 1
+		version = usuarios.version + 1
 	where
-		excluded.cnpj = :cnpj
+    	usuarios.cnpj = :cnpj
+		and usuarios.version = :version
 	returning
 		id,
 		created_at,
-		version,
+		version
 	`
+
+	var cnpjConferir = model.Cnpj
+	if cnpj != "" {
+		cnpjConferir = cnpj
+	}
 
 	params := map[string]any{
 		"nome":     model.Nome,
 		"telefone": model.Telefone,
-		"cnpj":     cnpj,
+		"cnpj":     cnpjConferir,
 		"email":    model.Email,
 		"senha":    model.Senha.Hash,
 		"ID":       ID,
+		"version":  model.Version,
 	}
 
 	query, args := repository.NamedQuery(query, params)
@@ -213,11 +232,21 @@ func (r *usuarioRepository) InsertOrUpdate(
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	return tx.QueryRowContext(ctx, query, args...).Scan(
+	err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&model.ID,
 		&model.CreatedAt,
 		&model.Version,
 	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return e.ErrEditConflict
+		}
+
+		return parseUserConstraintError(err)
+	}
+
+	return nil
 }
 
 func (r *usuarioRepository) Delete(tx *sql.Tx, id, userID uuid.UUID, cnpj string) error {
@@ -254,7 +283,7 @@ func (r *usuarioRepository) Delete(tx *sql.Tx, id, userID uuid.UUID, cnpj string
 	}
 
 	if rowsAffected == 0 {
-		return errors.ErrRecordNotFound
+		return e.ErrRecordNotFound
 	}
 
 	return nil
