@@ -37,7 +37,7 @@ func ParseStringField(
 	errRsp e.ErrorHandler,
 	field string,
 ) (string, bool) {
-	value, err := readStringPathVariable(r, "field")
+	value, err := readStringPathVariable(r, field)
 	if err != nil {
 		errRsp.BadRequestResponse(w, r, err)
 		return "", false

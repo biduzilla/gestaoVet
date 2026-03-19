@@ -8,8 +8,6 @@ import (
 	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
 	"net/http"
-
-	"github.com/google/uuid"
 )
 
 type empresaHandler struct {
@@ -52,8 +50,13 @@ func (h *empresaHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
 
 	input.Filters.Page = handler.ReadIntParam(r, "page", 1, v)
 	input.Filters.PageSize = handler.ReadIntParam(r, "page_size", 20, v)
-	input.Filters.Sort = handler.ReadStringParam(r, "sort", "id")
-	input.Filters.SortSafelist = []string{"id", "nome", "-id", "-nome"}
+	input.Filters.Sort = handler.ReadStringParam(r, "sort", "cnpj")
+	input.Filters.SortSafelist = []string{"cnpj", "nome_fantasia", "-nome_fantasia", "-nome_fantasia"}
+
+	if filters.ValidateFilters(v, input.Filters); !v.Valid() {
+		h.errHandler.FailedValidationResponse(w, r, v.Errors)
+		return
+	}
 
 	models, metadata, err := h.service.FindAll(
 		input.cnpj,
@@ -77,8 +80,8 @@ func (h *empresaHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
 		r,
 		http.StatusOK,
 		utils.Envelope{
-			utils.GetTypeName(dtos[0]): dtos,
-			"metadata":                 metadata,
+			utils.GetTypeName(EmpresaDTO{}): dtos,
+			"metadata":                      metadata,
 		},
 		nil,
 		h.errHandler,
@@ -116,7 +119,7 @@ func (h *empresaHandler) Save(w http.ResponseWriter, r *http.Request) {
 	v := validator.New()
 	model := dto.toModel()
 
-	if err := h.service.Save(model, v, uuid.Nil); err != nil {
+	if err := h.service.Save(model, v); err != nil {
 		h.errHandler.HandlerError(w, r, err, v)
 		return
 	}
@@ -135,7 +138,7 @@ func (h *empresaHandler) Update(w http.ResponseWriter, r *http.Request) {
 	user := contexts.ContextGetUser(r)
 	model := dto.toModel()
 
-	if err := h.service.Save(model, v, user.GetID()); err != nil {
+	if err := h.service.Update(model, v, user.GetID(), user.GetCNPJ()); err != nil {
 		h.errHandler.HandlerError(w, r, err, v)
 		return
 	}

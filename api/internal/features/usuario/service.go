@@ -34,6 +34,11 @@ type UsuarioService interface {
 	Save(
 		v *validator.Validator,
 		model *Usuario,
+	) error
+
+	Update(
+		v *validator.Validator,
+		model *Usuario,
 		cnpj string,
 		ID uuid.UUID,
 	) error
@@ -83,6 +88,19 @@ func (s *usuarioService) FindAll(
 func (s *usuarioService) Save(
 	v *validator.Validator,
 	model *Usuario,
+) error {
+	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+		if model.Validate(v); !v.Valid() {
+			return errors.ErrInvalidData
+		}
+
+		return s.repository.Insert(tx, model)
+	})
+}
+
+func (s *usuarioService) Update(
+	v *validator.Validator,
+	model *Usuario,
 	cnpj string,
 	ID uuid.UUID,
 ) error {
@@ -91,7 +109,7 @@ func (s *usuarioService) Save(
 			return errors.ErrInvalidData
 		}
 
-		return s.repository.InsertOrUpdate(tx, model, cnpj, ID)
+		return s.repository.Update(tx, model, cnpj, ID)
 	})
 }
 

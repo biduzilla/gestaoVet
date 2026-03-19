@@ -36,7 +36,12 @@ type UsuarioRepository interface {
 		f filters.Filters,
 	) ([]*Usuario, filters.Metadata, error)
 
-	InsertOrUpdate(
+	Insert(
+		tx *sql.Tx,
+		model *Usuario,
+	) error
+
+	Update(
 		tx *sql.Tx,
 		model *Usuario,
 		cnpj string,
@@ -68,7 +73,7 @@ func parseUserConstraintError(err error) error {
 		case "user_telefone_key":
 			return e.ValidationAlreadyExists("telefone")
 		case "usuarios_cnpj_fkey":
-			return e.ErrCnpjNotFound
+			return e.ErrRecordNotFound
 		}
 	}
 	return err
@@ -173,11 +178,9 @@ func (r *usuarioRepository) FindAll(
 	)
 }
 
-func (r *usuarioRepository) InsertOrUpdate(
+func (r *usuarioRepository) Insert(
 	tx *sql.Tx,
 	model *Usuario,
-	cnpj string,
-	ID uuid.UUID,
 ) error {
 	query := `
 	insert into usuarios (
@@ -194,34 +197,71 @@ func (r *usuarioRepository) InsertOrUpdate(
 		:senha,
 		:cnpj
 	)
-	on conflict (email) where deleted = false
-	do update set
-		nome = excluded.nome,
-		telefone = excluded.telefone,
-		email = excluded.email,
-		updated_at = now(),
-		updated_by = :ID,
-		version = usuarios.version + 1
-	where
-    	usuarios.cnpj = :cnpj
-		and usuarios.version = :version
 	returning
 		id,
 		created_at,
 		version
 	`
 
-	var cnpjConferir = model.Cnpj
-	if cnpj != "" {
-		cnpjConferir = cnpj
+	params := map[string]any{
+		"nome":     model.Nome,
+		"telefone": model.Telefone,
+		"cnpj":     model.Cnpj,
+		"email":    model.Email,
+		"senha":    model.Senha.Hash,
 	}
+
+	query, args := repository.NamedQuery(query, params)
+	r.logger.PrintInfo(utils.MinifySQL(query), nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := tx.QueryRowContext(ctx, query, args...).Scan(
+		&model.ID,
+		&model.CreatedAt,
+		&model.Version,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return e.ErrRecordNotFound
+		}
+
+		return parseUserConstraintError(err)
+	}
+
+	return nil
+}
+
+func (r *usuarioRepository) Update(
+	tx *sql.Tx,
+	model *Usuario,
+	cnpj string,
+	ID uuid.UUID,
+) error {
+	query := `
+	update usuarios
+	set
+		nome = :nome,
+		telefone = :telefone,
+		email = :email,
+		updated_at = now(),
+		updated_by = :ID,
+		version = usuarios.version + 1
+	where
+    	cnpj = :cnpj
+		version = :version
+		and deleted = false
+	returning
+		version
+	`
 
 	params := map[string]any{
 		"nome":     model.Nome,
 		"telefone": model.Telefone,
-		"cnpj":     cnpjConferir,
+		"cnpj":     cnpj,
 		"email":    model.Email,
-		"senha":    model.Senha.Hash,
 		"ID":       ID,
 		"version":  model.Version,
 	}
@@ -252,8 +292,8 @@ func (r *usuarioRepository) InsertOrUpdate(
 func (r *usuarioRepository) Delete(tx *sql.Tx, id, userID uuid.UUID, cnpj string) error {
 	query := `
 	UPDATE usuarios set
-		deleted = true
-		updated_at = now()
+		deleted = true,
+		updated_at = now(),
 		updated_by = :userID
 	where 
 		id = :id

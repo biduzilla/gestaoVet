@@ -41,10 +41,16 @@ type EmpresaRepository interface {
 		f filters.Filters,
 	) ([]*Empresa, filters.Metadata, error)
 
-	InsertOrUpdate(
+	Insert(
+		tx *sql.Tx,
+		model *Empresa,
+	) error
+
+	Update(
 		tx *sql.Tx,
 		model *Empresa,
 		userID uuid.UUID,
+		cnpj string,
 	) error
 
 	Delete(tx *sql.Tx, cnpj string, userID uuid.UUID) error
@@ -53,6 +59,8 @@ type EmpresaRepository interface {
 func parseEmpresaConstraintError(err error) error {
 	if pqErr, ok := err.(*pq.Error); ok {
 		switch pqErr.Constraint {
+		case "empresas_pkey":
+			return e.ValidationAlreadyExists("cnpj")
 		case "empresas_email_key":
 			return e.ValidationAlreadyExists("email")
 		case "empresas_razao_social_key":
@@ -100,13 +108,12 @@ func (r *empresaRepository) FindAll(
 		from empresas e
         WHERE
             (to_tsvector('simple', e.cnpj) @@ plainto_tsquery('simple', :cnpj) OR :cnpj = '')
-            (to_tsvector('simple', e.nomeFantasia) @@ plainto_tsquery('simple', :nomeFantasia) OR :nomeFantasia = '')
-            (to_tsvector('simple', e.razaoSocial) @@ plainto_tsquery('simple', :razaoSocial) OR :razaoSocial = '')
-            (to_tsvector('simple', e.email) @@ plainto_tsquery('simple', :email) OR :email = '')
+            and (to_tsvector('simple', e.nome_fantasia) @@ plainto_tsquery('simple', :nomeFantasia) OR :nomeFantasia = '')
+            and (to_tsvector('simple', e.razao_social) @@ plainto_tsquery('simple', :razaoSocial) OR :razaoSocial = '')
+            and (to_tsvector('simple', e.email) @@ plainto_tsquery('simple', :email) OR :email = '')
 			and e.deleted = false
 		ORDER BY
-            e.%s %s,
-            e.id ASC
+            e.%s %s
         LIMIT :limit
         OFFSET :offset
 	`, cols,
@@ -136,10 +143,9 @@ func (r *empresaRepository) FindAll(
 	)
 }
 
-func (r *empresaRepository) InsertOrUpdate(
+func (r *empresaRepository) Insert(
 	tx *sql.Tx,
 	model *Empresa,
-	userID uuid.UUID,
 ) error {
 	query := `
 	insert into empresas (
@@ -154,14 +160,6 @@ func (r *empresaRepository) InsertOrUpdate(
 		:razaoSocial,
 		:email
 	)
-	on conflict (cnpj) where deleted = false
-	do update set
-		nome_fantasia = excluded.nome_fantasia,
-		razao_social = excluded.razao_social,
-		email = excluded.email,
-		updated_at = now(),
-		updated_by = :userID,
-		version = empresas.version + 1
 	returning
 		created_at,
 		version
@@ -172,7 +170,6 @@ func (r *empresaRepository) InsertOrUpdate(
 		"razaoSocial":  model.RazaoSocial,
 		"cnpj":         model.Cnpj,
 		"email":        model.Email,
-		"userID":       userID,
 	}
 
 	query, args := repository.NamedQuery(query, params)
@@ -183,6 +180,58 @@ func (r *empresaRepository) InsertOrUpdate(
 
 	err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&model.CreatedAt,
+		&model.Version,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return e.ErrRecordNotFound
+		}
+
+		return parseEmpresaConstraintError(err)
+	}
+
+	return nil
+}
+
+func (r *empresaRepository) Update(
+	tx *sql.Tx,
+	model *Empresa,
+	userID uuid.UUID,
+	cnpj string,
+) error {
+	query := `
+	update empresas
+	set 
+		nome_fantasia = :nomeFantasia,
+		razao_social = :razaoSocial,
+		email = :email,
+		updated_at = now(),
+		updated_by = :userId,
+		version = version + 1
+	where
+		cnpj = :cnpj
+		and version = :version
+		and deleted = false
+	returning
+		version
+	`
+
+	params := map[string]any{
+		"nomeFantasia": model.NomeFantasia,
+		"razaoSocial":  model.RazaoSocial,
+		"cnpj":         model.Cnpj,
+		"email":        model.Email,
+		"userId":       userID,
+		"version":      model.Version,
+	}
+
+	query, args := repository.NamedQuery(query, params)
+	r.logger.PrintInfo(utils.MinifySQL(query), nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&model.Version,
 	)
 	if err != nil {
@@ -199,8 +248,8 @@ func (r *empresaRepository) InsertOrUpdate(
 func (r *empresaRepository) Delete(tx *sql.Tx, cnpj string, userID uuid.UUID) error {
 	query := `
 	UPDATE empresas set
-		deleted = true
-		updated_at = now()
+		deleted = true,
+		updated_at = now(),
 		updated_by = :userID
 	where 
 		cnpj = :cnpj

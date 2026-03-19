@@ -27,6 +27,7 @@ type UsuarioDTO struct {
 	Email    *string    `json:"email"`
 	Cnpj     *string    `json:"cnpj"`
 	Senha    *string    `json:"senha,omitempty"`
+	Version  *int       `json:"version"`
 }
 
 func (u *Usuario) IsAnonymous() bool {
@@ -45,6 +46,7 @@ func (m Usuario) toDTO() *UsuarioDTO {
 		Telefone: &m.Telefone,
 		Email:    &m.Email,
 		Cnpj:     &m.Cnpj,
+		Version:  &m.Version,
 	}
 }
 
@@ -69,6 +71,10 @@ func (d UsuarioDTO) toModel() (*Usuario, error) {
 
 	if d.Cnpj != nil {
 		model.Cnpj = *d.Cnpj
+	}
+
+	if d.Version != nil {
+		model.Version = *d.Version
 	}
 
 	if d.Senha != nil {

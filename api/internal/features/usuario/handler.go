@@ -113,14 +113,13 @@ func (h *usuarioHandler) Save(w http.ResponseWriter, r *http.Request) {
 	}
 
 	v := validator.New()
-	user := contexts.ContextGetUser(r)
 	model, err := dto.toModel()
 	if err != nil {
 		h.errHandler.HandlerError(w, r, err, nil)
 		return
 	}
 
-	if err := h.service.Save(v, model, user.GetCNPJ(), user.GetID()); err != nil {
+	if err := h.service.Save(v, model); err != nil {
 		h.errHandler.HandlerError(w, r, err, v)
 		return
 	}
@@ -143,7 +142,7 @@ func (h *usuarioHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.Save(v, model, user.GetCNPJ(), user.GetID()); err != nil {
+	if err := h.service.Update(v, model, user.GetCNPJ(), user.GetID()); err != nil {
 		h.errHandler.HandlerError(w, r, err, v)
 		return
 	}

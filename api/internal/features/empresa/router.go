@@ -35,7 +35,7 @@ func (r *empresaRouter) Routes(router chi.Router) {
 			router.Get("/{cnpj}", r.handler.FindByCnpj)
 			router.Get("/", r.handler.FindByAll)
 			router.Put("/", r.handler.Update)
-			router.Delete("/{id}", r.handler.Delete)
+			router.Delete("/{cnpj}", r.handler.Delete)
 		})
 	})
 }

@@ -47,7 +47,6 @@ var (
 	ErrInvalidRole              = errors.New("invalid role")
 	ErrScanModel                = errors.New("dest must be a pointer")
 	ErrUnsupportedTypeScanModel = errors.New("unsupported slice type for db scan")
-	ErrCnpjNotFound             = errors.New("cnpj not found")
 )
 
 func (e *errorHandler) HandlerError(w http.ResponseWriter, r *http.Request, err error, v *validator.Validator) {
@@ -71,9 +70,6 @@ func (e *errorHandler) HandlerError(w http.ResponseWriter, r *http.Request, err 
 	case errors.Is(err, ErrInvalidCredentials):
 		e.InvalidCredentialsResponse(w, r)
 
-	case errors.Is(err, ErrCnpjNotFound):
-		e.BadRequestResponse(w, r, err)
-
 	case len(strings.Split(err.Error(), "->")) > 1:
 		parts := strings.Split(err.Error(), "->")
 		for i := 0; i+1 < len(parts); i += 2 {
@@ -88,7 +84,7 @@ func (e *errorHandler) HandlerError(w http.ResponseWriter, r *http.Request, err 
 }
 
 func ValidationAlreadyExists(field string) error {
-	return fmt.Errorf("%s -> a register with this %s address already exists", field, field)
+	return fmt.Errorf("%s->a register with this %s already exists", field, field)
 }
 
 func (e *errorHandler) NotPermittedResponse(w http.ResponseWriter, r *http.Request) {

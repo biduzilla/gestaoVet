@@ -21,6 +21,7 @@ type EmpresaDTO struct {
 	RazaoSocial  *string `json:"razaoSocial"`
 	Cnpj         *string `json:"cnpj"`
 	Email        *string `json:"email"`
+	Version      *int    `json:"version"`
 }
 
 func (m Empresa) toDTO() *EmpresaDTO {
@@ -29,6 +30,7 @@ func (m Empresa) toDTO() *EmpresaDTO {
 		NomeFantasia: &m.NomeFantasia,
 		RazaoSocial:  &m.RazaoSocial,
 		Email:        &m.Email,
+		Version:      &m.Version,
 	}
 }
 
@@ -49,6 +51,10 @@ func (d EmpresaDTO) toModel() *Empresa {
 
 	if d.Email != nil {
 		model.Email = *d.Email
+	}
+
+	if d.Version != nil {
+		model.Version = *d.Version
 	}
 
 	return &model

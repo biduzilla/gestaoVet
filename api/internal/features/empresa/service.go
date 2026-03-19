@@ -30,8 +30,9 @@ type EmpresaService interface {
 		cnpj, nomeFantasia, razaoSocial, email string,
 		f filters.Filters,
 	) ([]*Empresa, filters.Metadata, error)
-	Save(model *Empresa, v *validator.Validator, userID uuid.UUID) error
 	FindByCnpj(cnpj string) (*Empresa, error)
+	Save(model *Empresa, v *validator.Validator) error
+	Update(model *Empresa, v *validator.Validator, userID uuid.UUID, cnpj string) error
 	Delete(cnpj string, userID uuid.UUID) error
 }
 
@@ -42,13 +43,23 @@ func (s *empresaService) FindAll(
 	return s.repository.FindAll(cnpj, nomeFantasia, razaoSocial, email, f)
 }
 
-func (s *empresaService) Save(model *Empresa, v *validator.Validator, userID uuid.UUID) error {
+func (s *empresaService) Save(model *Empresa, v *validator.Validator) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
 		if model.Validate(v); !v.Valid() {
 			return errors.ErrInvalidData
 		}
 
-		return s.repository.InsertOrUpdate(tx, model, userID)
+		return s.repository.Insert(tx, model)
+	})
+}
+
+func (s *empresaService) Update(model *Empresa, v *validator.Validator, userID uuid.UUID, cnpj string) error {
+	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+		if model.Validate(v); !v.Valid() {
+			return errors.ErrInvalidData
+		}
+
+		return s.repository.Update(tx, model, userID, cnpj)
 	})
 }
 
