@@ -2,8 +2,10 @@ package usuario
 
 import (
 	"errors"
+	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/domain/models"
 	"gestaoVet/internal/core/validator"
+	"gestaoVet/internal/features/empresa"
 	"regexp"
 
 	"github.com/google/uuid"
@@ -50,7 +52,7 @@ func (m Usuario) toDTO() *UsuarioDTO {
 	}
 }
 
-func (d UsuarioDTO) toModel() (*Usuario, error) {
+func (d UsuarioDTO) toModel(v *validator.Validator) (*Usuario, error) {
 	var model Usuario
 
 	if d.ID != nil {
@@ -70,6 +72,10 @@ func (d UsuarioDTO) toModel() (*Usuario, error) {
 	}
 
 	if d.Cnpj != nil {
+		v.Check(empresa.ValidateCNPJ(*d.Cnpj), "cnpj", "invalid cnpj format")
+		if !v.Valid() {
+			return nil, e.ErrInvalidData
+		}
 		model.Cnpj = *d.Cnpj
 	}
 
@@ -78,6 +84,11 @@ func (d UsuarioDTO) toModel() (*Usuario, error) {
 	}
 
 	if d.Senha != nil {
+		ValidatePasswordPlaintext(v, *d.Senha)
+		if !v.Valid() {
+			return nil, e.ErrInvalidData
+		}
+
 		err := model.Senha.Set(*d.Senha)
 		if err != nil {
 			return nil, err
@@ -100,12 +111,8 @@ func (u *Usuario) Validate(v *validator.Validator) {
 func ValidateTelefone(telefone string) bool {
 	telefone = regexp.MustCompile(`[^\d]`).ReplaceAllString(telefone, "")
 
-	switch len(telefone) {
-	case 8, 9, 10, 11:
-		return true
-	default:
-		return false
-	}
+	match, _ := regexp.MatchString(`^\d{2}9\d{8}$`, telefone)
+	return match
 }
 
 func (p *password) Set(plaintextPassword string) error {

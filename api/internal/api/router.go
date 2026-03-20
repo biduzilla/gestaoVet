@@ -38,6 +38,7 @@ func NewRouter(
 			Service: h.Services.UsuarioService,
 		},
 		h.Services.AuthService,
+		logger,
 	)
 	return &Router{
 		m:          m,
@@ -55,6 +56,7 @@ func (router *Router) RegisterRoutes() *chi.Mux {
 	r.Use(router.m.RateLimit)
 	r.Use(router.m.EnableCORS)
 	r.Use(router.m.Authenticate)
+	r.Use(router.m.Logging)
 
 	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
 		router.errHandler.NotFoundResponse(w, req)

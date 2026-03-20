@@ -7,6 +7,7 @@ import (
 	"gestaoVet/internal/core/contexts"
 	"gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/interfaces"
+	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/internal/core/validator"
 	"net"
 	"net/http"
@@ -38,6 +39,7 @@ type middleware struct {
 	userFinder UserFinder
 	jwtService JWTService
 	config     config.Config
+	logger     jsonlog.Logger
 }
 
 type Middleware interface {
@@ -48,6 +50,7 @@ type Middleware interface {
 	Authenticate(next http.Handler) http.Handler
 	RateLimit(next http.Handler) http.Handler
 	RecoverPanic(next http.Handler) http.Handler
+	Logging(next http.Handler) http.Handler
 }
 
 func New(
@@ -55,12 +58,14 @@ func New(
 	config config.Config,
 	userFinder UserFinder,
 	jwtService JWTService,
+	logger jsonlog.Logger,
 ) *middleware {
 	return &middleware{
 		userFinder: userFinder,
 		jwtService: jwtService,
 		errHandler: errHandler,
 		config:     config,
+		logger:     logger,
 	}
 }
 
@@ -257,5 +262,23 @@ func (m *middleware) RecoverPanic(next http.Handler) http.Handler {
 			}
 		}()
 		next.ServeHTTP(w, r)
+	})
+}
+
+func (m *middleware) Logging(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		mw := newMetricsResponseWriter(w)
+
+		next.ServeHTTP(mw, r)
+
+		m.logger.PrintInfo("request processed", map[string]string{
+			"method":   r.Method,
+			"path":     r.URL.Path,
+			"remote":   r.RemoteAddr,
+			"status":   http.StatusText(mw.statusCode),
+			"duration": time.Since(start).String(),
+		})
 	})
 }

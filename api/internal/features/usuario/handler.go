@@ -113,9 +113,9 @@ func (h *usuarioHandler) Save(w http.ResponseWriter, r *http.Request) {
 	}
 
 	v := validator.New()
-	model, err := dto.toModel()
+	model, err := dto.toModel(v)
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, nil)
+		h.errHandler.HandlerError(w, r, err, v)
 		return
 	}
 
@@ -136,9 +136,9 @@ func (h *usuarioHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	v := validator.New()
 	user := contexts.ContextGetUser(r)
-	model, err := dto.toModel()
+	model, err := dto.toModel(v)
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, nil)
+		h.errHandler.HandlerError(w, r, err, v)
 		return
 	}
 
