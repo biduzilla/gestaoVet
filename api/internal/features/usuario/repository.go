@@ -273,8 +273,6 @@ func (r *usuarioRepository) Update(
 	defer cancel()
 
 	err := tx.QueryRowContext(ctx, query, args...).Scan(
-		&model.ID,
-		&model.CreatedAt,
 		&model.Version,
 	)
 

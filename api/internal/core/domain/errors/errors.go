@@ -42,6 +42,7 @@ var (
 	ErrEditConflict             = errors.New("edit conflict")
 	ErrInvalidData              = errors.New("invalid data")
 	ErrInvalidCredentials       = errors.New("invalid authentication credentials")
+	ErrCountPermissions         = errors.New("one or more permissions do not exist")
 	ErrInactiveAccount          = errors.New("your user account must be activated to access this resource")
 	ErrStartDateAfterEndDate    = errors.New("start date must be before end date")
 	ErrInvalidRole              = errors.New("invalid role")

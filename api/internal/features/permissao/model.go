@@ -23,7 +23,6 @@ const (
 )
 
 type Permissao struct {
-	models.BaseModelCnpj
 	ID      uuid.UUID `db:"id"`
 	Recurso Recurso   `db:"recurso"`
 	Acao    Acao      `db:"acao"`
