@@ -172,6 +172,11 @@ func (u *Usuario) GetIsAtivo() bool {
 	return u.IsAtivo
 }
 
-func (u *Usuario) GetRoles() []string {
-	return []string{}
+func (u *Usuario) GetRoles() []int {
+	roles := make([]int, len(u.Roles))
+	for i, r := range u.Roles {
+		roles[i] = int(r)
+	}
+
+	return roles
 }

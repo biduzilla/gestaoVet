@@ -22,7 +22,6 @@ type usuarioRepository struct {
 }
 
 type UsuarioRepository interface {
-	repository.BaseRepository[Usuario]
 	FindByEmail(
 		email string,
 	) (*Usuario, error)

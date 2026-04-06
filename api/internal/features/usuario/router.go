@@ -32,10 +32,18 @@ func (r *usuarioRouter) Routes(router chi.Router) {
 		router.Group(func(router chi.Router) {
 			router.Use(r.m.RequireActivatedUser)
 
+			router.Use()
 			router.Get("/{id}", r.handler.FindByID)
 			router.Get("/", r.handler.FindByAll)
-			router.Put("/", r.handler.Update)
-			router.Delete("/{id}", r.handler.Delete)
+			router.Post("/", r.handler.Save)
+
+			router.With(
+				r.m.RequirePermission([]int{int(ROLE_ADMIN)}),
+			).Put("/", r.handler.Update)
+
+			router.With(
+				r.m.RequirePermission([]int{int(ROLE_ADMIN)}),
+			).Delete("/{id}", r.handler.Delete)
 		})
 
 	})

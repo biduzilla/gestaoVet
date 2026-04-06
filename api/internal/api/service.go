@@ -6,7 +6,6 @@ import (
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/internal/features/auth"
 	"gestaoVet/internal/features/empresa"
-	"gestaoVet/internal/features/permissao"
 	"gestaoVet/internal/features/usuario"
 )
 
@@ -14,7 +13,6 @@ type Services struct {
 	empresa.EmpresaService
 	usuario.UsuarioService
 	auth.AuthService
-	permissao.CargoService
 }
 
 func NewServices(db *sql.DB, logger jsonlog.Logger, config config.Config) *Services {
@@ -24,6 +22,5 @@ func NewServices(db *sql.DB, logger jsonlog.Logger, config config.Config) *Servi
 		EmpresaService: empresa.NewService(r.Empresa, db),
 		UsuarioService: usuarioService,
 		AuthService:    auth.NewService(usuarioService, config),
-		CargoService:   permissao.NewService(db, r.Cargos),
 	}
 }

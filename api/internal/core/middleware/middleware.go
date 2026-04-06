@@ -11,6 +11,7 @@ import (
 	"gestaoVet/internal/core/validator"
 	"net"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,6 +52,7 @@ type Middleware interface {
 	RateLimit(next http.Handler) http.Handler
 	RecoverPanic(next http.Handler) http.Handler
 	Logging(next http.Handler) http.Handler
+	RequirePermission(codes []int) func(http.Handler) http.Handler
 }
 
 func New(
@@ -198,6 +200,33 @@ func (m *middleware) Authenticate(next http.Handler) http.Handler {
 		r = contexts.ContextSetUser(r, user)
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (m *middleware) RequirePermission(codes []int) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			user := contexts.ContextGetUser(r)
+
+			permissions := user.GetRoles()
+
+			hasPermission := false
+
+			for _, code := range codes {
+				if slices.Contains(permissions, code) {
+					hasPermission = true
+					break
+				}
+			}
+
+			if !hasPermission {
+				m.errHandler.NotPermittedResponse(w, r)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func (m *middleware) RateLimit(next http.Handler) http.Handler {
