@@ -12,6 +12,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type Role int
+
+const (
+	ROLE_ADMIN Role = iota + 1
+	ROLE_VET
+	ROLE_ASSISTANT
+	ROLE_RECEPTIONIST
+)
+
 type Usuario struct {
 	models.BaseModelCnpj
 	ID       uuid.UUID `db:"id"`
@@ -20,6 +29,7 @@ type Usuario struct {
 	Email    string    `db:"email"`
 	Senha    password  `db:"-"`
 	IsAtivo  bool      `db:"is_ativo"`
+	Roles    []Role    `db:"roles"`
 }
 
 type UsuarioDTO struct {
@@ -160,4 +170,8 @@ func (u *Usuario) GetCNPJ() string {
 
 func (u *Usuario) GetIsAtivo() bool {
 	return u.IsAtivo
+}
+
+func (u *Usuario) GetRoles() []string {
+	return []string{}
 }

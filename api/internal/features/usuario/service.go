@@ -94,6 +94,7 @@ func (s *usuarioService) Save(
 			return errors.ErrInvalidData
 		}
 
+		model.Roles = append(model.Roles, ROLE_RECEPTIONIST)
 		return s.repository.Insert(tx, model)
 	})
 }
