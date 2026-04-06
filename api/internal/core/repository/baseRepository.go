@@ -21,11 +21,7 @@ type BaseRepository[T any] interface {
 		query string,
 		params map[string]any,
 	) ([]*T, filters.Metadata, error)
-
-	ListAll() ([]*T, error)
-
-	Delete(tx *sql.Tx, query string, params map[string]any) error
-
+	DeleteByQuery(tx *sql.Tx, query string, params map[string]any) error
 	Count(query string, params map[string]any) (int64, error)
 	Exists(query string, params map[string]any) (bool, error)
 }
@@ -34,11 +30,13 @@ type baseRepository[T any] struct {
 	db     *sql.DB
 	logger jsonlog.Logger
 	table  string
+	alias  string
 }
 
 func NewBaseRepository[T any](
 	db *sql.DB,
 	logger jsonlog.Logger,
+	alias string,
 ) BaseRepository[T] {
 	var table T
 	tableName := utils.GetTypeName(table)
@@ -47,6 +45,7 @@ func NewBaseRepository[T any](
 		db:     db,
 		logger: logger,
 		table:  tableName,
+		alias:  alias,
 	}
 }
 
@@ -71,7 +70,7 @@ func (r *baseRepository[T]) Exists(query string, params map[string]any) (bool, e
 	return exists, err
 }
 
-func (r *baseRepository[T]) FindById(id interface{}) (*T, error) {
+func (r *baseRepository[T]) FindById(id any) (*T, error) {
 	query := fmt.Sprintf(`
 	select %s
 	from %s
@@ -88,27 +87,27 @@ func (r *baseRepository[T]) FindById(id interface{}) (*T, error) {
 func (r *baseRepository[T]) Find(query string, params map[string]any) ([]*T, error) {
 	finalQuery := fmt.Sprintf(`
 	select %s
-	from %s
+	from %s as %s
 	where
 		%s
 		and deleted = false
-	`, r.selectColumns(), r.table, query)
+	`, r.selectColumns(), r.alias, r.table, query)
 
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
 
-	return ListQuery[T](r.db, queryStr, args, r.factory)
+	return ListQuery(r.db, queryStr, args, r.factory)
 }
 
 func (r *baseRepository[T]) FindOne(query string, params map[string]any) (*T, error) {
 	finalQuery := fmt.Sprintf(`
 	select %s
-	from %s
+	from %s as %s
 	where
 		%s
 		and deleted = false
 	limit 1
-	`, r.selectColumns(), r.table, query)
+	`, r.selectColumns(), r.alias, r.table, query)
 
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
@@ -116,25 +115,12 @@ func (r *baseRepository[T]) FindOne(query string, params map[string]any) (*T, er
 	return GetByQuery[T](r.db, queryStr, args)
 }
 
-func (r *baseRepository[T]) ListAll() ([]*T, error) {
-	query := fmt.Sprintf(`
-        SELECT %s 
-        FROM %s 
-        WHERE deleted = false 
-        ORDER BY id
-    `, r.selectColumns(), r.table)
-
-	r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	return ListQuery[T](r.db, query, nil, r.factory)
-}
-
 func (r *baseRepository[T]) Count(query string, params map[string]any) (int64, error) {
 	finalQuery := fmt.Sprintf(`
         SELECT COUNT(*)
-        FROM %s 
+        FROM %s as %s
         WHERE %s AND deleted = false
-    `, r.table, query)
+    `, r.table, r.alias, query)
 
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
@@ -151,11 +137,11 @@ func (r *baseRepository[T]) FindWithFilters(
 ) ([]*T, filters.Metadata, error) {
 	finalQuery := fmt.Sprintf(`
         SELECT COUNT(*) OVER(), %s
-        FROM %s 
+        FROM %s as %s
         WHERE %s AND deleted = false
         ORDER BY %s %s
         LIMIT $%d OFFSET $%d
-    `, r.selectColumns(), r.table, query, f.SortColumn(), f.SortDirection(),
+    `, r.selectColumns(), r.table, r.alias, query, f.SortColumn(), f.SortDirection(),
 		len(params)+1, len(params)+2)
 
 	params["limit"] = f.PageSize
@@ -164,10 +150,10 @@ func (r *baseRepository[T]) FindWithFilters(
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
 
-	return PaginatedQuery[T](r.db, queryStr, args, f, r.factory)
+	return PaginatedQuery(r.db, queryStr, args, f, r.factory)
 }
 
-func (r *baseRepository[T]) Delete(tx *sql.Tx, query string, params map[string]any) error {
+func (r *baseRepository[T]) DeleteByQuery(tx *sql.Tx, query string, params map[string]any) error {
 	finalQuery := fmt.Sprintf(`
 	UPDATE %s set
 		deleted = true,
