@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     password_hash bytea NOT NULL,
     cnpj varchar(14) NOT NULL REFERENCES empresas(cnpj),
     is_ativo boolean NOT NULL DEFAULT true,
+    roles integer[] NOT NULL DEFAULT '{}',
     deleted boolean NOT NULL DEFAULT false,
     version integer NOT NULL DEFAULT 1,
     created_at timestamptz NOT NULL DEFAULT now(),
