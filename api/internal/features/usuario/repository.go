@@ -62,7 +62,7 @@ func NewRepository(
 	return &usuarioRepository{
 		db:             db,
 		logger:         logger,
-		baseRepository: repository.NewBaseRepository[Usuario](db, logger, "u"),
+		baseRepository: repository.NewBaseRepository[Usuario](db, logger, "usuarios", "u"),
 	}
 }
 
@@ -106,8 +106,6 @@ func (r *usuarioRepository) FindAll(
 		"nome":     nome,
 		"telefone": telefone,
 		"email":    email,
-		"limit":    f.Limit(),
-		"offset":   f.Offset(),
 	}
 	query := `
 			(to_tsvector('simple', u.nome) @@ plainto_tsquery('simple', :nome) OR :nome = '')

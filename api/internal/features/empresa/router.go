@@ -1,6 +1,7 @@
 package empresa
 
 import (
+	"gestaoVet/internal/core/interfaces"
 	"gestaoVet/internal/core/middleware"
 
 	"github.com/go-chi/chi"
@@ -34,8 +35,13 @@ func (r *empresaRouter) Routes(router chi.Router) {
 
 			router.Get("/{cnpj}", r.handler.FindByCnpj)
 			router.Get("/", r.handler.FindByAll)
-			router.Put("/", r.handler.Update)
-			router.Delete("/{cnpj}", r.handler.Delete)
+
+			router.Group(func(router chi.Router) {
+				router.Use(r.m.RequirePermission([]interfaces.Role{interfaces.ROLE_ADMIN}))
+
+				router.Put("/", r.handler.Update)
+				router.Delete("/{cnpj}", r.handler.Delete)
+			})
 		})
 	})
 }

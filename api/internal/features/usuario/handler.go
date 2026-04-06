@@ -75,8 +75,8 @@ func (h *usuarioHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
 		r,
 		http.StatusOK,
 		utils.Envelope{
-			utils.GetTypeName(dtos[0]): dtos,
-			"metadata":                 metadata,
+			"content":  dtos,
+			"metadata": metadata,
 		},
 		nil,
 		h.errHandler,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/jsonlog"
@@ -17,17 +16,19 @@ import (
 )
 
 type empresaRepository struct {
-	db     *sql.DB
-	logger jsonlog.Logger
+	db             *sql.DB
+	logger         jsonlog.Logger
+	baseRepository repository.BaseRepository[Empresa]
 }
 
 func NewRepository(
 	db *sql.DB,
 	logger jsonlog.Logger,
-) *empresaRepository {
+) EmpresaRepository {
 	return &empresaRepository{
-		db:     db,
-		logger: logger,
+		db:             db,
+		logger:         logger,
+		baseRepository: repository.NewBaseRepository[Empresa](db, logger, "empresas", "e"),
 	}
 }
 
@@ -75,72 +76,31 @@ func parseEmpresaConstraintError(err error) error {
 func (r *empresaRepository) FindByCnpj(
 	cnpj string,
 ) (*Empresa, error) {
-	cols := repository.SelectColumns(Empresa{}, "e")
-	query := fmt.Sprintf(`
-		select
-			%s
-		from empresas e
-		where
-			e.cnpj = :cnpj
-			and deleted = false
-	`, cols)
-
+	query := `e.cnpj = :cnpj`
 	params := map[string]any{
 		"cnpj": cnpj,
 	}
-
-	query, args := repository.NamedQuery(query, params)
-	r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	return repository.GetByQuery[Empresa](r.db, query, args)
+	return r.baseRepository.FindOne(query, params)
 }
 
 func (r *empresaRepository) FindAll(
 	cnpj, nomeFantasia, razaoSocial, email string,
 	f filters.Filters,
 ) ([]*Empresa, filters.Metadata, error) {
-	cols := repository.SelectColumns(Empresa{}, "e")
-
-	query := fmt.Sprintf(`
-		select
-			count(*) OVER(),
-			%s
-		from empresas e
-        WHERE
-            (to_tsvector('simple', e.cnpj) @@ plainto_tsquery('simple', :cnpj) OR :cnpj = '')
+	query := `(to_tsvector('simple', e.cnpj) @@ plainto_tsquery('simple', :cnpj) OR :cnpj = '')
             and (to_tsvector('simple', e.nome_fantasia) @@ plainto_tsquery('simple', :nomeFantasia) OR :nomeFantasia = '')
             and (to_tsvector('simple', e.razao_social) @@ plainto_tsquery('simple', :razaoSocial) OR :razaoSocial = '')
             and (to_tsvector('simple', e.email) @@ plainto_tsquery('simple', :email) OR :email = '')
-			and e.deleted = false
-		ORDER BY
-            e.%s %s
-        LIMIT :limit
-        OFFSET :offset
-	`, cols,
-		f.SortColumn(),
-		f.SortDirection())
+			and e.deleted = false`
 
 	params := map[string]any{
 		"cnpj":         cnpj,
 		"nomeFantasia": nomeFantasia,
 		"razaoSocial":  razaoSocial,
 		"email":        email,
-		"limit":        f.Limit(),
-		"offset":       f.Offset(),
 	}
 
-	query, args := repository.NamedQuery(query, params)
-	r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	return repository.PaginatedQuery(
-		r.db,
-		query,
-		args,
-		f,
-		func() *Empresa {
-			return &Empresa{}
-		},
-	)
+	return r.baseRepository.FindWithFilters(f, query, params)
 }
 
 func (r *empresaRepository) Insert(
@@ -246,38 +206,11 @@ func (r *empresaRepository) Update(
 }
 
 func (r *empresaRepository) Delete(tx *sql.Tx, cnpj string, userID uuid.UUID) error {
-	query := `
-	UPDATE empresas set
-		deleted = true,
-		updated_at = now(),
-		updated_by = :userID
-	where 
-		cnpj = :cnpj
-	`
-
+	query := `cnpj = :cnpj`
 	params := map[string]any{
 		"cnpj":   cnpj,
 		"userID": userID,
 	}
 
-	query, args := repository.NamedQuery(query, params)
-	r.logger.PrintInfo(utils.MinifySQL(query), nil)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	result, err := tx.ExecContext(ctx, query, args...)
-	if err != nil {
-		return err
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
-		return e.ErrRecordNotFound
-	}
-
-	return nil
+	return r.baseRepository.DeleteByQuery(tx, query, params)
 }

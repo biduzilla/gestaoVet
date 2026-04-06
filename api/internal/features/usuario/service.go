@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
+	"gestaoVet/internal/core/interfaces"
 	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
 
@@ -94,7 +95,7 @@ func (s *usuarioService) Save(
 			return errors.ErrInvalidData
 		}
 
-		model.Roles = append(model.Roles, ROLE_RECEPTIONIST)
+		model.Roles = append(model.Roles, interfaces.ROLE_RECEPTIONIST)
 		return s.repository.Insert(tx, model)
 	})
 }

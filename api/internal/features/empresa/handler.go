@@ -80,8 +80,8 @@ func (h *empresaHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
 		r,
 		http.StatusOK,
 		utils.Envelope{
-			utils.GetTypeName(EmpresaDTO{}): dtos,
-			"metadata":                      metadata,
+			"content":  dtos,
+			"metadata": metadata,
 		},
 		nil,
 		h.errHandler,

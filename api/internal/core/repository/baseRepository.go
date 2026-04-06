@@ -36,11 +36,9 @@ type baseRepository[T any] struct {
 func NewBaseRepository[T any](
 	db *sql.DB,
 	logger jsonlog.Logger,
+	tableName string,
 	alias string,
 ) BaseRepository[T] {
-	var table T
-	tableName := utils.GetTypeName(table)
-
 	return &baseRepository[T]{
 		db:     db,
 		logger: logger,
@@ -91,7 +89,7 @@ func (r *baseRepository[T]) Find(query string, params map[string]any) ([]*T, err
 	where
 		%s
 		and deleted = false
-	`, r.selectColumns(), r.alias, r.table, query)
+	`, r.selectColumns(), r.table, r.alias, query)
 
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
@@ -107,7 +105,7 @@ func (r *baseRepository[T]) FindOne(query string, params map[string]any) (*T, er
 		%s
 		and deleted = false
 	limit 1
-	`, r.selectColumns(), r.alias, r.table, query)
+	`, r.selectColumns(), r.table, r.alias, query)
 
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
@@ -140,12 +138,13 @@ func (r *baseRepository[T]) FindWithFilters(
         FROM %s as %s
         WHERE %s AND deleted = false
         ORDER BY %s %s
-        LIMIT $%d OFFSET $%d
+       	LIMIT :limit
+        OFFSET :offset
     `, r.selectColumns(), r.table, r.alias, query, f.SortColumn(), f.SortDirection(),
-		len(params)+1, len(params)+2)
+	)
 
-	params["limit"] = f.PageSize
-	params["offset"] = (f.Page - 1) * f.PageSize
+	params["limit"] = f.Limit()
+	params["offset"] = f.Offset()
 
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
@@ -189,7 +188,7 @@ func (r *baseRepository[T]) DeleteByQuery(tx *sql.Tx, query string, params map[s
 
 func (r *baseRepository[T]) selectColumns() string {
 	var model T
-	return SelectColumns(model, r.table)
+	return SelectColumns(model, r.alias)
 }
 
 func (r *baseRepository[T]) factory() *T {

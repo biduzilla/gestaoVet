@@ -52,7 +52,7 @@ type Middleware interface {
 	RateLimit(next http.Handler) http.Handler
 	RecoverPanic(next http.Handler) http.Handler
 	Logging(next http.Handler) http.Handler
-	RequirePermission(codes []int) func(http.Handler) http.Handler
+	RequirePermission(codes []interfaces.Role) func(http.Handler) http.Handler
 }
 
 func New(
@@ -202,7 +202,7 @@ func (m *middleware) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
-func (m *middleware) RequirePermission(codes []int) func(http.Handler) http.Handler {
+func (m *middleware) RequirePermission(codes []interfaces.Role) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 

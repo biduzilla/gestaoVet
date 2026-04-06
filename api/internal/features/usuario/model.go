@@ -4,6 +4,7 @@ import (
 	"errors"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/domain/models"
+	"gestaoVet/internal/core/interfaces"
 	"gestaoVet/internal/core/validator"
 	"gestaoVet/internal/features/empresa"
 	"regexp"
@@ -12,24 +13,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type Role int
-
-const (
-	ROLE_ADMIN Role = iota + 1
-	ROLE_VET
-	ROLE_ASSISTANT
-	ROLE_RECEPTIONIST
-)
-
 type Usuario struct {
 	models.BaseModelCnpj
-	ID       uuid.UUID `db:"id"`
-	Nome     string    `db:"nome"`
-	Telefone string    `db:"telefone"`
-	Email    string    `db:"email"`
-	Senha    password  `db:"-"`
-	IsAtivo  bool      `db:"is_ativo"`
-	Roles    []Role    `db:"roles"`
+	ID       uuid.UUID         `db:"id"`
+	Nome     string            `db:"nome"`
+	Telefone string            `db:"telefone"`
+	Email    string            `db:"email"`
+	Senha    password          `db:"-"`
+	IsAtivo  bool              `db:"is_ativo"`
+	Roles    []interfaces.Role `db:"roles"`
 }
 
 type UsuarioDTO struct {
@@ -172,11 +164,6 @@ func (u *Usuario) GetIsAtivo() bool {
 	return u.IsAtivo
 }
 
-func (u *Usuario) GetRoles() []int {
-	roles := make([]int, len(u.Roles))
-	for i, r := range u.Roles {
-		roles[i] = int(r)
-	}
-
-	return roles
+func (u *Usuario) GetRoles() []interfaces.Role {
+	return u.Roles
 }

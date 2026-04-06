@@ -1,6 +1,7 @@
 package usuario
 
 import (
+	"gestaoVet/internal/core/interfaces"
 	"gestaoVet/internal/core/middleware"
 
 	"github.com/go-chi/chi"
@@ -35,16 +36,13 @@ func (r *usuarioRouter) Routes(router chi.Router) {
 			router.Use()
 			router.Get("/{id}", r.handler.FindByID)
 			router.Get("/", r.handler.FindByAll)
-			router.Post("/", r.handler.Save)
 
-			router.With(
-				r.m.RequirePermission([]int{int(ROLE_ADMIN)}),
-			).Put("/", r.handler.Update)
+			router.Group(func(router chi.Router) {
+				router.Use(r.m.RequirePermission([]interfaces.Role{interfaces.ROLE_ADMIN}))
 
-			router.With(
-				r.m.RequirePermission([]int{int(ROLE_ADMIN)}),
-			).Delete("/{id}", r.handler.Delete)
+				router.Put("/", r.handler.Update)
+				router.Delete("/{id}", r.handler.Delete)
+			})
 		})
-
 	})
 }
