@@ -33,8 +33,8 @@ func (r *empresaRouter) Routes(router chi.Router) {
 		router.Group(func(router chi.Router) {
 			router.Use(r.m.RequireActivatedUser)
 
-			router.Get("/{cnpj}", r.handler.FindByCnpj)
 			router.Get("/", r.handler.FindByAll)
+			router.Get("/{cnpj}", r.handler.FindByCnpj)
 
 			router.Group(func(router chi.Router) {
 				router.Use(r.m.RequirePermission([]interfaces.Role{interfaces.ROLE_ADMIN}))

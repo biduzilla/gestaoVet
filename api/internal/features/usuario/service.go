@@ -95,7 +95,7 @@ func (s *usuarioService) Save(
 			return errors.ErrInvalidData
 		}
 
-		model.Roles = append(model.Roles, interfaces.ROLE_RECEPTIONIST)
+		model.Roles = append(model.Roles, int32(interfaces.ROLE_RECEPTIONIST))
 		return s.repository.Insert(tx, model)
 	})
 }

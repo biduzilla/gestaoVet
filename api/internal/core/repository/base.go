@@ -93,15 +93,15 @@ func collectFields(dest any) ([]any, error) {
 		tag := fieldType.Tag.Get("db")
 
 		if tag != "" && tag != "-" {
-
 			if fieldVal.Kind() == reflect.Slice {
+				fmt.Printf("TYPE: %T\n", fieldVal.Addr().Interface())
 				elemKind := fieldVal.Type().Elem().Kind()
 
 				switch elemKind {
 				case reflect.Uint8:
 					fields = append(fields, fieldVal.Addr().Interface())
 					continue
-				case reflect.String, reflect.Int, reflect.Int64:
+				case reflect.String, reflect.Int, reflect.Int32, reflect.Int64:
 					fields = append(fields, pq.Array(fieldVal.Addr().Interface()))
 					continue
 				default:
@@ -145,5 +145,6 @@ func collectFields(dest any) ([]any, error) {
 			fields = append(fields, subFields...)
 		}
 	}
+
 	return fields, nil
 }

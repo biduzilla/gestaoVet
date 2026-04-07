@@ -15,13 +15,13 @@ import (
 
 type Usuario struct {
 	models.BaseModelCnpj
-	ID       uuid.UUID         `db:"id"`
-	Nome     string            `db:"nome"`
-	Telefone string            `db:"telefone"`
-	Email    string            `db:"email"`
-	Senha    password          `db:"-"`
-	IsAtivo  bool              `db:"is_ativo"`
-	Roles    []interfaces.Role `db:"roles"`
+	ID       uuid.UUID `db:"id"`
+	Nome     string    `db:"nome"`
+	Telefone string    `db:"telefone"`
+	Email    string    `db:"email"`
+	Senha    password  `db:"-"`
+	IsAtivo  bool      `db:"is_ativo"`
+	Roles    []int32   `db:"roles"`
 }
 
 type UsuarioDTO struct {
@@ -165,5 +165,11 @@ func (u *Usuario) GetIsAtivo() bool {
 }
 
 func (u *Usuario) GetRoles() []interfaces.Role {
-	return u.Roles
+	roles := make([]interfaces.Role, len(u.Roles))
+
+	for i, r := range u.Roles {
+		roles[i] = interfaces.Role(r)
+	}
+
+	return roles
 }

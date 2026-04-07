@@ -127,14 +127,16 @@ func (r *usuarioRepository) Insert(
 		telefone,
 		email,
 		password_hash,
-		cnpj
+		cnpj,
+		roles
 	)
 	values (
 		:nome,
 		:telefone,
 		:email,
 		:senha,
-		:cnpj
+		:cnpj,
+		:roles
 	)
 	returning
 		id,
@@ -148,6 +150,7 @@ func (r *usuarioRepository) Insert(
 		"cnpj":     model.Cnpj,
 		"email":    model.Email,
 		"senha":    model.Senha.Hash,
+		"roles":    model.Roles,
 	}
 
 	query, args := repository.NamedQuery(query, params)
