@@ -33,6 +33,11 @@ type UsuarioDTO struct {
 	Version  *int       `json:"version"`
 }
 
+type RolesDTO struct {
+	ID    uuid.UUID `json:"id"`
+	Roles []int32   `json:"roles"`
+}
+
 func (u *Usuario) IsAnonymous() bool {
 	return false
 }

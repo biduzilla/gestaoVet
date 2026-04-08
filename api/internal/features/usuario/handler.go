@@ -19,6 +19,8 @@ type UsuarioHandler interface {
 	FindByID(w http.ResponseWriter, r *http.Request)
 	Save(w http.ResponseWriter, r *http.Request)
 	Update(w http.ResponseWriter, r *http.Request)
+	UpdateSenha(w http.ResponseWriter, r *http.Request)
+	UpdateRoles(w http.ResponseWriter, r *http.Request)
 	Delete(w http.ResponseWriter, r *http.Request)
 }
 
@@ -141,6 +143,48 @@ func (h *usuarioHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.Respond(w, r, http.StatusOK, model.toDTO(), nil, h.errHandler)
+}
+
+func (h *usuarioHandler) UpdateSenha(w http.ResponseWriter, r *http.Request) {
+	var dto UsuarioDTO
+	if err := handler.ReadJSON(w, r, &dto); err != nil {
+		h.errHandler.BadRequestResponse(w, r, err)
+		return
+	}
+
+	v := validator.New()
+	user := contexts.ContextGetUser(r)
+	model, err := dto.toModel(v)
+	if err != nil {
+		h.errHandler.HandlerError(w, r, err, v)
+		return
+	}
+
+	if err := h.service.UpdateSenha(model, user.GetCNPJ(), user.GetID()); err != nil {
+		h.errHandler.HandlerError(w, r, err, v)
+		return
+	}
+
+	handler.Respond(w, r, http.StatusOK, model.toDTO(), nil, h.errHandler)
+}
+
+func (h *usuarioHandler) UpdateRoles(w http.ResponseWriter, r *http.Request) {
+	var dto RolesDTO
+
+	if err := handler.ReadJSON(w, r, &dto); err != nil {
+		h.errHandler.BadRequestResponse(w, r, err)
+		return
+	}
+
+	v := validator.New()
+	user := contexts.ContextGetUser(r)
+
+	if err := h.service.UpdateRoles(v, dto.ID, dto.Roles, user.GetCNPJ(), user.GetID()); err != nil {
+		h.errHandler.HandlerError(w, r, err, v)
+		return
+	}
+
+	handler.Respond(w, r, http.StatusOK, nil, nil, h.errHandler)
 }
 
 func (h *usuarioHandler) Delete(w http.ResponseWriter, r *http.Request) {

@@ -31,14 +31,16 @@ func (r *usuarioRouter) Routes(router chi.Router) {
 		router.Group(func(router chi.Router) {
 			router.Use(r.m.RequireActivatedUser)
 
-			router.Post("/", r.handler.Save)
 			router.Get("/{id}", r.handler.FindByID)
 			router.Get("/", r.handler.FindByAll)
 
 			router.Group(func(router chi.Router) {
 				router.Use(r.m.RequirePermission([]interfaces.Role{interfaces.ROLE_ADMIN}))
 
-				router.Put("/", r.handler.Update)
+				router.Post("/", r.handler.Save)
+				router.Put("/senha", r.handler.Update)
+				router.Put("/roles", r.handler.UpdateSenha)
+				router.Put("/", r.handler.UpdateRoles)
 				router.Delete("/{id}", r.handler.Delete)
 			})
 		})
