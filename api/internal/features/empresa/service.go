@@ -3,25 +3,31 @@ package empresa
 import (
 	"database/sql"
 	"gestaoVet/internal/core/domain/errors"
+	"gestaoVet/internal/core/domain/models"
 	"gestaoVet/internal/core/filters"
+	"gestaoVet/internal/core/interfaces"
 	"gestaoVet/internal/core/validator"
+	"gestaoVet/internal/features/usuario"
 	"gestaoVet/utils"
 
 	"github.com/google/uuid"
 )
 
 type empresaService struct {
-	repository EmpresaRepository
-	db         *sql.DB
+	repository     EmpresaRepository
+	usuarioService usuario.UsuarioService
+	db             *sql.DB
 }
 
 func NewService(
+	usuarioService usuario.UsuarioService,
 	repository EmpresaRepository,
 	db *sql.DB,
 ) *empresaService {
 	return &empresaService{
-		repository: repository,
-		db:         db,
+		usuarioService: usuarioService,
+		repository:     repository,
+		db:             db,
 	}
 }
 
@@ -49,7 +55,12 @@ func (s *empresaService) Save(model *Empresa, v *validator.Validator) error {
 			return errors.ErrInvalidData
 		}
 
-		return s.repository.Insert(tx, model)
+		err := s.repository.Insert(tx, model)
+		if err != nil {
+			return err
+		}
+
+		return s.createUserAdmin(model, v)
 	})
 }
 
@@ -70,5 +81,21 @@ func (s *empresaService) FindByCnpj(cnpj string) (*Empresa, error) {
 func (s *empresaService) Delete(cnpj string, userID uuid.UUID) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
 		return s.repository.Delete(tx, cnpj, userID)
+	})
+}
+
+func (s *empresaService) createUserAdmin(model *Empresa, v *validator.Validator) error {
+	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+		var user = usuario.Usuario{
+			Nome:     model.RazaoSocial,
+			Telefone: model.Telefone,
+			Email:    model.Email,
+			BaseModelCnpj: models.BaseModelCnpj{
+				Cnpj: model.Cnpj,
+			},
+			Roles: []int32{int32(interfaces.ROLE_ADMIN)},
+		}
+		user.Senha.Set(model.Cnpj)
+		return s.usuarioService.Save(v, &user)
 	})
 }

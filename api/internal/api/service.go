@@ -19,7 +19,7 @@ func NewServices(db *sql.DB, logger jsonlog.Logger, config config.Config) *Servi
 	r := NewRepository(db, logger)
 	usuarioService := usuario.NewService(r.Usuario, db)
 	return &Services{
-		EmpresaService: empresa.NewService(r.Empresa, db),
+		EmpresaService: empresa.NewService(usuarioService, r.Empresa, db),
 		UsuarioService: usuarioService,
 		AuthService:    auth.NewService(usuarioService, config),
 	}

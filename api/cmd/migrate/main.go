@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"gestaoVet/internal/core/config"
 	"log"
 	"os"
 
@@ -11,8 +12,8 @@ import (
 )
 
 const (
-	dialect  = "pgx"
-	dbString = "postgres://api_user:api_password@postgres:5432/api_db?sslmode=disable"
+	dialect = "pgx"
+	// dbString = "postgres://api_user:api_password@postgres:5432/api_db?sslmode=disable"
 )
 
 var (
@@ -21,6 +22,8 @@ var (
 )
 
 func main() {
+	c := config.New()
+
 	flags.Usage = usage
 	flags.Parse(os.Args[1:])
 
@@ -32,7 +35,7 @@ func main() {
 
 	command := args[0]
 
-	db, err := goose.OpenDBWithDriver(dialect, dbString)
+	db, err := goose.OpenDBWithDriver(dialect, c.DB.DSN)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -28,12 +28,10 @@ func NewRouter(
 
 func (r *usuarioRouter) Routes(router chi.Router) {
 	router.Route("/usuario", func(router chi.Router) {
-		router.Post("/", r.handler.Save)
-
 		router.Group(func(router chi.Router) {
 			router.Use(r.m.RequireActivatedUser)
 
-			router.Use()
+			router.Post("/", r.handler.Save)
 			router.Get("/{id}", r.handler.FindByID)
 			router.Get("/", r.handler.FindByAll)
 

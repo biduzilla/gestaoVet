@@ -48,6 +48,13 @@ type UsuarioRepository interface {
 		ID uuid.UUID,
 	) error
 
+	UpdateSenha(
+		tx *sql.Tx,
+		model *Usuario,
+		cnpj string,
+		ID uuid.UUID,
+	) error
+
 	Delete(tx *sql.Tx,
 		id,
 		userID uuid.UUID,
@@ -190,10 +197,12 @@ func (r *usuarioRepository) Update(
 		email = :email,
 		updated_at = now(),
 		updated_by = :ID,
+		roles = :roles
 		version = usuarios.version + 1
 	where
-    	cnpj = :cnpj
-		version = :version
+		id = :userId
+    	and cnpj = :cnpj
+		and version = :version
 		and deleted = false
 	returning
 		version
@@ -206,6 +215,8 @@ func (r *usuarioRepository) Update(
 		"email":    model.Email,
 		"ID":       ID,
 		"version":  model.Version,
+		"roles":    model.Roles,
+		"userId":   model.ID,
 	}
 
 	query, args := repository.NamedQuery(query, params)
@@ -224,6 +235,58 @@ func (r *usuarioRepository) Update(
 		}
 
 		return parseUserConstraintError(err)
+	}
+
+	return nil
+}
+
+func (r *usuarioRepository) UpdateSenha(
+	tx *sql.Tx,
+	model *Usuario,
+	cnpj string,
+	ID uuid.UUID,
+) error {
+	query := `
+	update usuarios
+	set
+		password_hash = :senha,
+		updated_at = now(),
+		updated_by = :ID,
+		version = usuarios.version + 1
+	where
+		id = :userId
+    	and cnpj = :cnpj
+		and version = :version
+		and deleted = false
+	`
+
+	params := map[string]any{
+		"senha":   model.Senha.Hash,
+		"cnpj":    cnpj,
+		"ID":      ID,
+		"version": model.Version,
+		"userId":  model.ID,
+	}
+
+	query, args := repository.NamedQuery(query, params)
+	r.logger.PrintInfo(utils.MinifySQL(query), nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	result, err := tx.ExecContext(ctx, query, args...)
+
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return e.ErrRecordNotFound
 	}
 
 	return nil

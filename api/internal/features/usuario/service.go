@@ -44,6 +44,20 @@ type UsuarioService interface {
 		ID uuid.UUID,
 	) error
 
+	UpdateRoles(
+		v *validator.Validator,
+		userID uuid.UUID,
+		roles []int32,
+		cnpj string,
+		ID uuid.UUID,
+	) error
+
+	UpdateSenha(
+		model *Usuario,
+		cnpj string,
+		ID uuid.UUID,
+	) error
+
 	Delete(
 		id,
 		userID uuid.UUID,
@@ -100,6 +114,25 @@ func (s *usuarioService) Save(
 	})
 }
 
+func (s *usuarioService) UpdateRoles(
+	v *validator.Validator,
+	userID uuid.UUID,
+	roles []int32,
+	cnpj string,
+	ID uuid.UUID,
+) error {
+	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+		user, err := s.FindByID(userID, cnpj)
+		if err != nil {
+			return err
+		}
+
+		user.Roles = roles
+		user.SetRolesReplace()
+		return s.Update(v, user, cnpj, ID)
+	})
+}
+
 func (s *usuarioService) Update(
 	v *validator.Validator,
 	model *Usuario,
@@ -112,6 +145,16 @@ func (s *usuarioService) Update(
 		}
 
 		return s.repository.Update(tx, model, cnpj, ID)
+	})
+}
+
+func (s *usuarioService) UpdateSenha(
+	model *Usuario,
+	cnpj string,
+	ID uuid.UUID,
+) error {
+	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+		return s.repository.UpdateSenha(tx, model, cnpj, ID)
 	})
 }
 

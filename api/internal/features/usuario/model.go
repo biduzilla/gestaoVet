@@ -6,8 +6,7 @@ import (
 	"gestaoVet/internal/core/domain/models"
 	"gestaoVet/internal/core/interfaces"
 	"gestaoVet/internal/core/validator"
-	"gestaoVet/internal/features/empresa"
-	"regexp"
+	"gestaoVet/utils"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -74,7 +73,7 @@ func (d UsuarioDTO) toModel(v *validator.Validator) (*Usuario, error) {
 	}
 
 	if d.Cnpj != nil {
-		v.Check(empresa.ValidateCNPJ(*d.Cnpj), "cnpj", "invalid cnpj format")
+		v.Check(utils.ValidateCNPJ(*d.Cnpj), "cnpj", "invalid cnpj format")
 		if !v.Valid() {
 			return nil, e.ErrInvalidData
 		}
@@ -105,16 +104,9 @@ func (u *Usuario) Validate(v *validator.Validator) {
 	v.Check(len(u.Nome) >= 3, "nome", "must be at least 3 characters long")
 	v.Check(len(u.Nome) <= 100, "nome", "must not be more than 100 characters long")
 	v.Check(u.Telefone != "", "telefone", "must be provided")
-	v.Check(ValidateTelefone(u.Telefone), "telefone", "invalid telephone format")
+	v.Check(utils.ValidateTelefone(u.Telefone), "telefone", "invalid telephone format")
 	v.Check(u.Email != "", "email", "must be provided")
 	v.Check(validator.Matches(u.Email, validator.EmailRX), "email", "must be a valid email address")
-}
-
-func ValidateTelefone(telefone string) bool {
-	telefone = regexp.MustCompile(`[^\d]`).ReplaceAllString(telefone, "")
-
-	match, _ := regexp.MatchString(`^\d{2}9\d{8}$`, telefone)
-	return match
 }
 
 func (p *password) Set(plaintextPassword string) error {
@@ -172,4 +164,18 @@ func (u *Usuario) GetRoles() []interfaces.Role {
 	}
 
 	return roles
+}
+
+func (u *Usuario) SetRolesReplace() {
+	uniqueRoles := make(map[int32]bool)
+	for _, role := range u.Roles {
+		uniqueRoles[role] = true
+	}
+
+	result := make([]int32, 0, len(uniqueRoles))
+	for role := range uniqueRoles {
+		result = append(result, role)
+	}
+
+	u.Roles = result
 }

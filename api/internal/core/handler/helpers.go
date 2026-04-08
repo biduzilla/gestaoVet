@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	e "gestaoVet/internal/core/domain/errors"
+	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
 	"io"
@@ -29,6 +30,21 @@ func ParseIntID(
 		return 0, false
 	}
 	return id, true
+}
+
+func GetFilters(r *http.Request, v *validator.Validator, sortSafelist []string) (filters.Filters, error) {
+	var f = filters.Filters{}
+	f.Page = ReadIntParam(r, "page", 1, v)
+	f.PageSize = ReadIntParam(r, "page_size", 20, v)
+	f.Sort = ReadStringParam(r, "sort", "cnpj")
+	f.SortSafelist = sortSafelist
+
+	if filters.ValidateFilters(v, f); !v.Valid() {
+		return filters.Filters{}, e.ErrInvalidData
+	}
+
+	return f, nil
+
 }
 
 func ParseStringField(

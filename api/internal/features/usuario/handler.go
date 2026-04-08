@@ -3,7 +3,6 @@ package usuario
 import (
 	"gestaoVet/internal/core/contexts"
 	"gestaoVet/internal/core/domain/errors"
-	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/handler"
 	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
@@ -34,32 +33,26 @@ func NewHandler(
 }
 
 func (h *usuarioHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		nome     string
-		telefone string
-		email    string
-		cnpj     string
-		filters.Filters
+	v := validator.New()
+	cnpj := handler.ReadStringParam(r, "cnpj", "")
+	telefone := handler.ReadStringParam(r, "telefone", "")
+	nome := handler.ReadStringParam(r, "nome", "")
+	email := handler.ReadStringParam(r, "email", "")
+
+	f, err := handler.GetFilters(r, v, []string{"id", "nome", "-id", "-nome"})
+	if err != nil {
+		h.errHandler.HandlerError(w, r, err, v)
+		return
 	}
 
-	v := validator.New()
-	input.cnpj = handler.ReadStringParam(r, "cnpj", "")
-	input.telefone = handler.ReadStringParam(r, "telefone", "")
-	input.nome = handler.ReadStringParam(r, "nome", "")
-	input.email = handler.ReadStringParam(r, "email", "")
-
-	input.Filters.Page = handler.ReadIntParam(r, "page", 1, v)
-	input.Filters.PageSize = handler.ReadIntParam(r, "page_size", 20, v)
-	input.Filters.Sort = handler.ReadStringParam(r, "sort", "id")
-	input.Filters.SortSafelist = []string{"id", "nome", "-id", "-nome"}
-
 	models, metadata, err := h.service.FindAll(
-		input.nome,
-		input.telefone,
-		input.email,
-		input.cnpj,
-		input.Filters,
+		nome,
+		telefone,
+		email,
+		cnpj,
+		f,
 	)
+
 	if err != nil {
 		h.errHandler.HandlerError(w, r, err, v)
 		return

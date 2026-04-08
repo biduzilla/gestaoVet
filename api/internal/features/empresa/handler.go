@@ -3,7 +3,6 @@ package empresa
 import (
 	"gestaoVet/internal/core/contexts"
 	"gestaoVet/internal/core/domain/errors"
-	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/handler"
 	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
@@ -34,36 +33,24 @@ type EmpresaHandler interface {
 }
 
 func (h *empresaHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		cnpj,
-		nomeFantasia,
-		razaoSocial,
-		email string
-		filters.Filters
-	}
-
 	v := validator.New()
-	input.cnpj = handler.ReadStringParam(r, "cnpj", "")
-	input.nomeFantasia = handler.ReadStringParam(r, "nomeFantasia", "")
-	input.razaoSocial = handler.ReadStringParam(r, "razaoSocial", "")
-	input.email = handler.ReadStringParam(r, "email", "")
+	cnpj := handler.ReadStringParam(r, "cnpj", "")
+	nomeFantasia := handler.ReadStringParam(r, "nomeFantasia", "")
+	razaoSocial := handler.ReadStringParam(r, "razaoSocial", "")
+	email := handler.ReadStringParam(r, "email", "")
 
-	input.Filters.Page = handler.ReadIntParam(r, "page", 1, v)
-	input.Filters.PageSize = handler.ReadIntParam(r, "page_size", 20, v)
-	input.Filters.Sort = handler.ReadStringParam(r, "sort", "cnpj")
-	input.Filters.SortSafelist = []string{"cnpj", "nome_fantasia", "-nome_fantasia", "-nome_fantasia"}
-
-	if filters.ValidateFilters(v, input.Filters); !v.Valid() {
-		h.errHandler.FailedValidationResponse(w, r, v.Errors)
+	f, err := handler.GetFilters(r, v, []string{"cnpj", "nome_fantasia", "-nome_fantasia", "-nome_fantasia"})
+	if err != nil {
+		h.errHandler.HandlerError(w, r, err, v)
 		return
 	}
 
 	models, metadata, err := h.service.FindAll(
-		input.cnpj,
-		input.nomeFantasia,
-		input.razaoSocial,
-		input.email,
-		input.Filters,
+		cnpj,
+		nomeFantasia,
+		razaoSocial,
+		email,
+		f,
 	)
 	if err != nil {
 		h.errHandler.HandlerError(w, r, err, v)

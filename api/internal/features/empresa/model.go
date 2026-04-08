@@ -3,8 +3,7 @@ package empresa
 import (
 	"gestaoVet/internal/core/domain/models"
 	"gestaoVet/internal/core/validator"
-	"strconv"
-	"strings"
+	"gestaoVet/utils"
 )
 
 type Empresa struct {
@@ -12,6 +11,7 @@ type Empresa struct {
 	Cnpj         string `db:"cnpj"`
 	NomeFantasia string `db:"nome_fantasia"`
 	RazaoSocial  string `db:"razao_social"`
+	Telefone     string `db:"telefone"`
 	IsAtivo      bool   `db:"is_ativo"`
 	Email        string `db:"email"`
 }
@@ -19,6 +19,7 @@ type Empresa struct {
 type EmpresaDTO struct {
 	NomeFantasia *string `json:"nomeFantasia"`
 	RazaoSocial  *string `json:"razaoSocial"`
+	Telefone     *string `json:"telefone"`
 	Cnpj         *string `json:"cnpj"`
 	Email        *string `json:"email"`
 	Version      *int    `json:"version"`
@@ -30,6 +31,7 @@ func (m Empresa) toDTO() *EmpresaDTO {
 		NomeFantasia: &m.NomeFantasia,
 		RazaoSocial:  &m.RazaoSocial,
 		Email:        &m.Email,
+		Telefone:     &m.Telefone,
 		Version:      &m.Version,
 	}
 }
@@ -53,6 +55,10 @@ func (d EmpresaDTO) toModel() *Empresa {
 		model.Email = *d.Email
 	}
 
+	if d.Telefone != nil {
+		model.Telefone = *d.Telefone
+	}
+
 	if d.Version != nil {
 		model.Version = *d.Version
 	}
@@ -67,90 +73,13 @@ func (e *Empresa) Validate(v *validator.Validator) {
 	v.Check(e.RazaoSocial != "", "razao_social", "must be provided")
 	v.Check(len(e.RazaoSocial) <= 100, "razao_social", "must not be more than 100 characters long")
 
+	v.Check(e.Telefone != "", "telefone", "must be provided")
+	v.Check(utils.ValidateTelefone(e.Telefone), "telefone", "invalid telephone format")
+
 	v.Check(e.Cnpj != "", "cnpj", "must be provided")
-	v.Check(ValidateCNPJ(e.Cnpj), "cnpj", "invalid CNPJ format or verification digits")
+	v.Check(utils.ValidateCNPJ(e.Cnpj), "cnpj", "invalid CNPJ format or verification digits")
 
 	v.Check(e.Email != "", "email", "must be provided")
 	v.Check(validator.Matches(e.Email, validator.EmailRX), "email", "must be a valid email address")
 
-}
-
-func ValidateCNPJ(cnpj string) bool {
-	cnpj = cleanCNPJ(cnpj)
-
-	if len(cnpj) != 14 {
-		return false
-	}
-
-	if allDigitsEqual(cnpj) {
-		return false
-	}
-
-	if !validateCNPJDigits(cnpj) {
-		return false
-	}
-
-	return true
-}
-
-func cleanCNPJ(cnpj string) string {
-	cnpj = strings.ReplaceAll(cnpj, ".", "")
-	cnpj = strings.ReplaceAll(cnpj, "-", "")
-	cnpj = strings.ReplaceAll(cnpj, "/", "")
-	cnpj = strings.ReplaceAll(cnpj, " ", "")
-	return cnpj
-}
-
-func allDigitsEqual(cnpj string) bool {
-	firstDigit := cnpj[0]
-	for i := 1; i < len(cnpj); i++ {
-		if cnpj[i] != firstDigit {
-			return false
-		}
-	}
-	return true
-}
-
-func validateCNPJDigits(cnpj string) bool {
-	digits := cnpj[:12]
-	firstDigit := calculateCNPJDigit(digits, true)
-	if firstDigit != int(cnpj[12]-'0') {
-		return false
-	}
-
-	digits = cnpj[:13]
-	secondDigit := calculateCNPJDigit(digits, false)
-	if secondDigit != int(cnpj[13]-'0') {
-		return false
-	}
-
-	return true
-}
-
-func calculateCNPJDigit(base string, isFirst bool) int {
-	var pesoInicial int
-	if isFirst {
-		pesoInicial = 5
-	} else {
-		pesoInicial = 6
-	}
-
-	soma := 0
-	peso := pesoInicial
-
-	for i := 0; i < len(base); i++ {
-		num, _ := strconv.Atoi(string(base[i]))
-		soma += num * peso
-		peso--
-
-		if peso < 2 {
-			peso = 9
-		}
-	}
-
-	resto := soma % 11
-	if resto < 2 {
-		return 0
-	}
-	return 11 - resto
 }

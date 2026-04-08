@@ -68,6 +68,8 @@ func parseEmpresaConstraintError(err error) error {
 			return e.ValidationAlreadyExists("razao_social")
 		case "empresas_nome_fantasia_key":
 			return e.ValidationAlreadyExists("nome_fantasia")
+		case "empresas_nome_telefone_key":
+			return e.ValidationAlreadyExists("telefone")
 		}
 	}
 	return err
@@ -112,13 +114,15 @@ func (r *empresaRepository) Insert(
 		cnpj,
 		nome_fantasia,
 		razao_social,
-		email
+		email,
+		telefone
 	)
 	values (
 		:cnpj,
 		:nomeFantasia,
 		:razaoSocial,
-		:email
+		:email,
+		:telefone
 	)
 	returning
 		created_at,
@@ -130,6 +134,7 @@ func (r *empresaRepository) Insert(
 		"razaoSocial":  model.RazaoSocial,
 		"cnpj":         model.Cnpj,
 		"email":        model.Email,
+		"telefone":     model.Telefone,
 	}
 
 	query, args := repository.NamedQuery(query, params)
@@ -165,6 +170,7 @@ func (r *empresaRepository) Update(
 		nome_fantasia = :nomeFantasia,
 		razao_social = :razaoSocial,
 		email = :email,
+		telefone = :telefone,
 		updated_at = now(),
 		updated_by = :userId,
 		version = version + 1
@@ -183,6 +189,7 @@ func (r *empresaRepository) Update(
 		"email":        model.Email,
 		"userId":       userID,
 		"version":      model.Version,
+		"telefone":     model.Telefone,
 	}
 
 	query, args := repository.NamedQuery(query, params)
