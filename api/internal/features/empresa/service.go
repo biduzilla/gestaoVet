@@ -60,7 +60,7 @@ func (s *empresaService) Save(model *Empresa, v *validator.Validator) error {
 			return err
 		}
 
-		return s.createUserAdmin(model, v)
+		return s.createUserAdmin(model, v, tx)
 	})
 }
 
@@ -84,18 +84,16 @@ func (s *empresaService) Delete(cnpj string, userID uuid.UUID) error {
 	})
 }
 
-func (s *empresaService) createUserAdmin(model *Empresa, v *validator.Validator) error {
-	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
-		var user = usuario.Usuario{
-			Nome:     model.RazaoSocial,
-			Telefone: model.Telefone,
-			Email:    model.Email,
-			BaseModelCnpj: models.BaseModelCnpj{
-				Cnpj: model.Cnpj,
-			},
-			Roles: []int32{int32(interfaces.ROLE_ADMIN)},
-		}
-		user.Senha.Set(model.Cnpj)
-		return s.usuarioService.Save(v, &user)
-	})
+func (s *empresaService) createUserAdmin(model *Empresa, v *validator.Validator, tx *sql.Tx) error {
+	var user = usuario.Usuario{
+		Nome:     model.RazaoSocial,
+		Telefone: model.Telefone,
+		Email:    model.Email,
+		BaseModelCnpj: models.BaseModelCnpj{
+			Cnpj: model.Cnpj,
+		},
+		Roles: []int32{int32(interfaces.ROLE_ADMIN)},
+	}
+	user.Senha.Set(model.Cnpj)
+	return s.usuarioService.Save(v, &user, tx)
 }

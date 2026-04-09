@@ -35,6 +35,7 @@ type UsuarioService interface {
 	Save(
 		v *validator.Validator,
 		model *Usuario,
+		tx *sql.Tx,
 	) error
 
 	Update(
@@ -53,7 +54,8 @@ type UsuarioService interface {
 	) error
 
 	UpdateSenha(
-		model *Usuario,
+		userID uuid.UUID,
+		senha string,
 		cnpj string,
 		ID uuid.UUID,
 	) error
@@ -103,15 +105,22 @@ func (s *usuarioService) FindAll(
 func (s *usuarioService) Save(
 	v *validator.Validator,
 	model *Usuario,
+	tx *sql.Tx,
 ) error {
-	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+	saveLogic := func(tx *sql.Tx) error {
 		if model.Validate(v); !v.Valid() {
 			return errors.ErrInvalidData
 		}
 
 		model.Roles = append(model.Roles, int32(interfaces.ROLE_RECEPTIONIST))
 		return s.repository.Insert(tx, model)
-	})
+	}
+
+	if tx != nil {
+		return saveLogic(tx)
+	}
+
+	return utils.RunInTx(s.db, saveLogic)
 }
 
 func (s *usuarioService) UpdateRoles(
@@ -149,12 +158,18 @@ func (s *usuarioService) Update(
 }
 
 func (s *usuarioService) UpdateSenha(
-	model *Usuario,
+	userID uuid.UUID,
+	senha string,
 	cnpj string,
 	ID uuid.UUID,
 ) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
-		return s.repository.UpdateSenha(tx, model, cnpj, ID)
+		user, err := s.FindByID(userID, cnpj)
+		if err != nil {
+			return err
+		}
+		user.Senha.Set(senha)
+		return s.repository.UpdateSenha(tx, user, cnpj, ID)
 	})
 }
 

@@ -114,7 +114,7 @@ func (h *usuarioHandler) Save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.Save(v, model); err != nil {
+	if err := h.service.Save(v, model, nil); err != nil {
 		h.errHandler.HandlerError(w, r, err, v)
 		return
 	}
@@ -153,19 +153,23 @@ func (h *usuarioHandler) UpdateSenha(w http.ResponseWriter, r *http.Request) {
 	}
 
 	v := validator.New()
+	v.Check(dto.ID != nil, "id", "id must be provide")
+	v.Check(dto.Senha != nil, "senha", "senha must be provide")
+	v.Check(*dto.Senha != "", "senha", "senha must be provide")
+
+	if !v.Valid() {
+		h.errHandler.FailedValidationResponse(w, r, v.Errors)
+		return
+	}
+
 	user := contexts.ContextGetUser(r)
-	model, err := dto.toModel(v)
-	if err != nil {
+
+	if err := h.service.UpdateSenha(*dto.ID, *dto.Senha, user.GetCNPJ(), user.GetID()); err != nil {
 		h.errHandler.HandlerError(w, r, err, v)
 		return
 	}
 
-	if err := h.service.UpdateSenha(model, user.GetCNPJ(), user.GetID()); err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
-		return
-	}
-
-	handler.Respond(w, r, http.StatusOK, model.toDTO(), nil, h.errHandler)
+	handler.Respond(w, r, http.StatusNoContent, nil, nil, h.errHandler)
 }
 
 func (h *usuarioHandler) UpdateRoles(w http.ResponseWriter, r *http.Request) {

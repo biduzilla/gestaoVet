@@ -41,7 +41,7 @@ func (h *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	v := validator.New()
-	accessToken, refreshToken, err := h.service.Login(v, input.Email, input.Password)
+	accessToken, refreshToken, userID, err := h.service.Login(v, input.Email, input.Password)
 
 	if err != nil {
 		h.errHandler.HandlerError(w, r, err, v)
@@ -55,6 +55,7 @@ func (h *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 		utils.Envelope{
 			"access_token":  accessToken,
 			"refresh_token": refreshToken,
+			"userID":        userID,
 		},
 		nil,
 		h.errHandler,

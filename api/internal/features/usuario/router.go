@@ -38,9 +38,9 @@ func (r *usuarioRouter) Routes(router chi.Router) {
 				router.Use(r.m.RequirePermission([]interfaces.Role{interfaces.ROLE_ADMIN}))
 
 				router.Post("/", r.handler.Save)
-				router.Put("/senha", r.handler.Update)
-				router.Put("/roles", r.handler.UpdateSenha)
-				router.Put("/", r.handler.UpdateRoles)
+				router.Put("/senha", r.handler.UpdateSenha)
+				router.Put("/roles", r.handler.UpdateRoles)
+				router.Put("/", r.handler.Update)
 				router.Delete("/{id}", r.handler.Delete)
 			})
 		})

@@ -41,6 +41,58 @@ func GetTypeName(v any) string {
 	return strings.ToLower(t.Name())
 }
 
+/*
+func RunInTx(
+	db any,
+	fn func(tx *sql.Tx) error,
+) error {
+	if tx, ok := db.(*sql.Tx); ok {
+		savepointName := fmt.Sprintf("sp_%d", time.Now().UnixNano())
+
+		_, err := tx.Exec(fmt.Sprintf("SAVEPOINT %s", savepointName))
+		if err != nil {
+			return fmt.Errorf("failed to create savepoint: %w", err)
+		}
+
+		fnErr := fn(tx)
+		if fnErr == nil {
+			_, err = tx.Exec(fmt.Sprintf("RELEASE SAVEPOINT %s", savepointName))
+			if err != nil {
+				return fmt.Errorf("failed to release savepoint: %w", err)
+			}
+			return nil
+		}
+
+		_, rbErr := tx.Exec(fmt.Sprintf("ROLLBACK TO SAVEPOINT %s", savepointName))
+		if rbErr != nil {
+			return errors.Join(fnErr, fmt.Errorf("failed to rollback to savepoint: %w", rbErr))
+		}
+
+		return fnErr
+	}
+
+	if sqlDB, ok := db.(*sql.DB); ok {
+		tx, err := sqlDB.Begin()
+		if err != nil {
+			return err
+		}
+
+		fnErr := fn(tx)
+		if fnErr == nil {
+			return tx.Commit()
+		}
+
+		if rbErr := tx.Rollback(); rbErr != nil {
+			return errors.Join(fnErr, rbErr)
+		}
+
+		return fnErr
+	}
+
+	return fmt.Errorf("invalid db type: expected *sql.DB or *sql.Tx")
+}
+*/
+
 func RunInTx(
 	db *sql.DB,
 	fn func(tx *sql.Tx) error,

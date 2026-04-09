@@ -94,7 +94,6 @@ func collectFields(dest any) ([]any, error) {
 
 		if tag != "" && tag != "-" {
 			if fieldVal.Kind() == reflect.Slice {
-				fmt.Printf("TYPE: %T\n", fieldVal.Addr().Interface())
 				elemKind := fieldVal.Type().Elem().Kind()
 
 				switch elemKind {

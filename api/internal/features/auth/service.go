@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 type authService struct {
@@ -26,7 +27,7 @@ type AuthService interface {
 	Login(
 		v *validator.Validator,
 		email, password string,
-	) (string, string, error)
+	) (string, string, uuid.UUID, error)
 
 	ExtractUsername(tokenString string) (string, error)
 	RefreshToken(refreshToken string) (string, error)
@@ -45,42 +46,42 @@ func NewService(
 func (s *authService) Login(
 	v *validator.Validator,
 	email, password string,
-) (string, string, error) {
+) (string, string, uuid.UUID, error) {
 	usuario.ValidatePasswordPlaintext(v, password)
 
 	if !v.Valid() {
-		return "", "", errors.ErrInvalidData
+		return "", "", uuid.Nil, errors.ErrInvalidData
 	}
 
 	user, err := s.usuarioService.FindByEmail(email, v)
 	if err != nil {
-		return "", "", err
+		return "", "", uuid.Nil, err
 	}
 
 	if !user.IsAtivo {
-		return "", "", errors.ErrInactiveAccount
+		return "", "", uuid.Nil, errors.ErrInactiveAccount
 	}
 
 	match, err := user.Senha.Matches(password)
 	if err != nil {
-		return "", "", err
+		return "", "", uuid.Nil, err
 	}
 
 	if !match {
-		return "", "", errors.ErrInvalidCredentials
+		return "", "", uuid.Nil, errors.ErrInvalidCredentials
 	}
 
 	token, err := s.createAccessToken(user.Email)
 	if err != nil {
-		return "", "", err
+		return "", "", uuid.Nil, err
 	}
 
 	refreshToken, err := s.createRefreshToken(user.Email)
 	if err != nil {
-		return "", "", err
+		return "", "", uuid.Nil, err
 	}
 
-	return token, refreshToken, nil
+	return token, refreshToken, user.ID, nil
 }
 
 func (s *authService) createAccessToken(username string) (string, error) {
