@@ -186,22 +186,30 @@ func (m *middleware) Authenticate(next http.Handler) http.Handler {
 
 		token := headerParts[1]
 		username, err := m.jwtService.ExtractUsername(token)
-		if err != nil {
+		if err != nil || username == "" {
 			m.errHandler.InvalidAuthenticationTokenResponse(w, r)
 			return
 		}
 
 		auth := contexts.ContextGetUser(r)
-		if username != "" && auth.GetID() == uuid.Nil {
-			v := validator.New()
-			user, err := m.userFinder.FindByEmail(username, v)
-			if err != nil {
-				m.errHandler.HandlerError(w, r, err, v)
-				return
-			}
-
-			r = contexts.ContextSetUser(r, user)
+		if auth.GetID() != uuid.Nil {
+			next.ServeHTTP(w, r)
+			return
 		}
+
+		v := validator.New()
+		user, err := m.userFinder.FindByEmail(username, v)
+		if err != nil {
+			m.errHandler.HandlerError(w, r, err, v)
+			return
+		}
+
+		if !user.GetIsAtivo() {
+			m.errHandler.InactiveAccountResponse(w, r)
+			return
+		}
+
+		r = contexts.ContextSetUser(r, user)
 
 		next.ServeHTTP(w, r)
 	})
