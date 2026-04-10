@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 )
 
@@ -190,14 +191,18 @@ func (m *middleware) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 
-		v := validator.New()
-		user, err := m.userFinder.FindByEmail(username, v)
-		if err != nil {
-			m.errHandler.HandlerError(w, r, err, v)
-			return
+		auth := contexts.ContextGetUser(r)
+		if username != "" && auth.GetID() == uuid.Nil {
+			v := validator.New()
+			user, err := m.userFinder.FindByEmail(username, v)
+			if err != nil {
+				m.errHandler.HandlerError(w, r, err, v)
+				return
+			}
+
+			r = contexts.ContextSetUser(r, user)
 		}
 
-		r = contexts.ContextSetUser(r, user)
 		next.ServeHTTP(w, r)
 	})
 }
