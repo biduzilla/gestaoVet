@@ -13,6 +13,7 @@ const (
 
 type User interface {
 	GetID() uuid.UUID
+	GetUsername() string
 	GetCNPJ() string
 	GetIsAtivo() bool
 	IsAnonymous() bool
@@ -21,10 +22,11 @@ type User interface {
 
 type anonymousUser struct{}
 
-func (anonymousUser) GetID() uuid.UUID  { return uuid.Nil }
-func (anonymousUser) GetCNPJ() string   { return "" }
-func (anonymousUser) GetIsAtivo() bool  { return false }
-func (anonymousUser) IsAnonymous() bool { return true }
-func (anonymousUser) GetRoles() []Role  { return []Role{} }
+func (anonymousUser) GetID() uuid.UUID    { return uuid.Nil }
+func (anonymousUser) GetUsername() string { return "" }
+func (anonymousUser) GetCNPJ() string     { return "" }
+func (anonymousUser) GetIsAtivo() bool    { return false }
+func (anonymousUser) IsAnonymous() bool   { return true }
+func (anonymousUser) GetRoles() []Role    { return []Role{} }
 
 var AnonymousUser User = anonymousUser{}

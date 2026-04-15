@@ -166,6 +166,8 @@ func (u *Usuario) GetIsAtivo() bool {
 	return u.IsAtivo
 }
 
+func (u *Usuario) GetUsername() string { return u.Email }
+
 func (u *Usuario) GetRoles() []interfaces.Role {
 	roles := make([]interfaces.Role, len(u.Roles))
 

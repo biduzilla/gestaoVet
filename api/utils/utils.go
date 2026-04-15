@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"gestaoVet/internal/core/interfaces"
 	"maps"
 	"net/http"
 	"reflect"
@@ -92,6 +93,14 @@ func RunInTx(
 	return fmt.Errorf("invalid db type: expected *sql.DB or *sql.Tx")
 }
 */
+
+func ConvertInt32ToRoles(rolesInt32 []int32) []interfaces.Role {
+	roles := make([]interfaces.Role, len(rolesInt32))
+	for i, r := range rolesInt32 {
+		roles[i] = interfaces.Role(r)
+	}
+	return roles
+}
 
 func RunInTx(
 	db *sql.DB,

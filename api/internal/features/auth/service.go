@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"gestaoVet/internal/core/config"
 	"gestaoVet/internal/core/domain/errors"
+	"gestaoVet/internal/core/domain/models"
+	"gestaoVet/internal/core/interfaces"
 	"gestaoVet/internal/core/validator"
 	"gestaoVet/internal/features/usuario"
+	"gestaoVet/utils"
 	"os"
 	"time"
 
@@ -36,9 +39,7 @@ type AuthService interface {
 		email, password string,
 	) (string, string, uuid.UUID, error)
 
-	ExtractUsername(tokenString string) (string, error)
-	ExtractUserID(tokenString string) (uuid.UUID, error)
-	ExtractRoles(tokenString string) ([]int32, error)
+	ExtractAuthenticatedUser(tokenString string) (interfaces.User, error)
 	RefreshToken(refreshToken string) (string, error)
 	ValidateToken(tokenString string) (*jwt.Token, error)
 	GetPublicKey() *rsa.PublicKey
@@ -137,12 +138,12 @@ func (s *authService) Login(
 		return "", "", uuid.Nil, errors.ErrInvalidCredentials
 	}
 
-	token, err := s.createAccessToken(user.Email, user.ID.String(), user.Roles)
+	token, err := s.createAccessToken(user)
 	if err != nil {
 		return "", "", uuid.Nil, err
 	}
 
-	refreshToken, err := s.createRefreshToken(user.Email, user.ID.String(), user.Roles)
+	refreshToken, err := s.createRefreshToken(user)
 	if err != nil {
 		return "", "", uuid.Nil, err
 	}
@@ -150,14 +151,16 @@ func (s *authService) Login(
 	return token, refreshToken, user.ID, nil
 }
 
-func (s *authService) createAccessToken(username string, userID string, roles []int32) (string, error) {
+func (s *authService) createAccessToken(user interfaces.User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256,
 		jwt.MapClaims{
-			"username": username,
-			"user_id":  userID,
-			"roles":    roles,
+			"username": user.GetUsername(),
+			"user_id":  user.GetID(),
+			"cnpj":     user.GetCNPJ(),
+			"is_ativo": user.GetIsAtivo(),
+			"roles":    user.GetRoles(),
 			"type":     TokenTypeAccess,
-			"exp":      time.Now().Add(time.Hour * 24).Unix(),
+			"exp":      time.Now().Add(7 * 24 * time.Hour).Unix(),
 			"iat":      time.Now().Unix(),
 		})
 	tokenStr, err := token.SignedString(s.privateKey)
@@ -169,12 +172,14 @@ func (s *authService) createAccessToken(username string, userID string, roles []
 	return tokenStr, nil
 }
 
-func (s *authService) createRefreshToken(username string, userID string, roles []int32) (string, error) {
+func (s *authService) createRefreshToken(user interfaces.User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256,
 		jwt.MapClaims{
-			"username": username,
-			"user_id":  userID,
-			"roles":    roles,
+			"username": user.GetUsername(),
+			"user_id":  user.GetID(),
+			"cnpj":     user.GetCNPJ(),
+			"is_ativo": user.GetIsAtivo(),
+			"roles":    user.GetRoles(),
 			"type":     TokenTypeRefresh,
 			"exp":      time.Now().Add(7 * 24 * time.Hour).Unix(),
 			"iat":      time.Now().Unix(),
@@ -183,60 +188,48 @@ func (s *authService) createRefreshToken(username string, userID string, roles [
 	return token.SignedString(s.privateKey)
 }
 
-func (s *authService) ExtractUsername(tokenString string) (string, error) {
-	claims, ok, err := s.extractClaims(tokenString)
+func (s *authService) ExtractAuthenticatedUser(token string) (interfaces.User, error) {
+	claims, ok, err := s.extractClaims(token)
 	if !ok {
-		return "", nil
+		return nil, nil
 	}
 
 	if err != nil {
-		return "", err
-	}
-
-	username, ok := claims["username"].(string)
-	if !ok {
-		return "", nil
-	}
-
-	return username, nil
-}
-
-func (s *authService) ExtractUserID(tokenString string) (uuid.UUID, error) {
-	claims, ok, err := s.extractClaims(tokenString)
-
-	if err != nil {
-		return uuid.Nil, err
-	}
-
-	if !ok {
-		return uuid.Nil, nil
+		return nil, err
 	}
 
 	userIDStr, ok := claims["user_id"].(string)
 	if !ok {
-		return uuid.Nil, errors.ErrInvalidCredentials
+		return nil, errors.ErrInvalidCredentials
 	}
 
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("user_id inválido: %w", err)
+		return nil, fmt.Errorf("user_id inválido: %w", err)
 	}
 
-	return userID, nil
-}
-
-func (s *authService) ExtractRoles(tokenString string) ([]int32, error) {
-	claims, ok, err := s.extractClaims(tokenString)
-
-	if err != nil {
-		return []int32{}, err
-	}
-
+	username, ok := claims["username"].(string)
 	if !ok {
-		return []int32{}, nil
+		return nil, nil
 	}
 
-	return s.getRolesFromClaims(claims)
+	cnpj, ok := claims["cnpj"].(string)
+	if !ok {
+		return nil, nil
+	}
+
+	isAtivo, ok := claims["is_ativo"].(bool)
+	if !ok {
+		isAtivo = false
+	}
+
+	roles, err := s.getRolesFromClaims(claims)
+	if err != nil {
+		return nil, err
+	}
+
+	return models.NewAuthenticatedUser(userID, username, cnpj, isAtivo, utils.ConvertInt32ToRoles(roles)), nil
+
 }
 
 func (s *authService) extractClaims(tokenString string) (jwt.MapClaims, bool, error) {
@@ -286,28 +279,12 @@ func (s *authService) RefreshToken(refreshToken string) (string, error) {
 		return "", errors.ErrInvalidCredentials
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return "", errors.ErrInvalidCredentials
+	user, err := s.ExtractAuthenticatedUser(refreshToken)
+	if err != nil {
+		return "", err
 	}
 
-	if claims["type"] != string(TokenTypeRefresh) {
-		return "", errors.ErrInvalidCredentials
-	}
-
-	username, ok := claims["username"].(string)
-	if !ok {
-		return "", errors.ErrInvalidCredentials
-	}
-
-	userID, ok := claims["user_id"].(string)
-	if !ok {
-		return "", errors.ErrInvalidCredentials
-	}
-
-	roles, err := s.getRolesFromClaims(claims)
-
-	return s.createAccessToken(username, userID, roles)
+	return s.createAccessToken(user)
 }
 
 func (s *authService) ValidateToken(tokenString string) (*jwt.Token, error) {
