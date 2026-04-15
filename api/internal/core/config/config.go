@@ -24,7 +24,8 @@ type Config struct {
 		TrustedOrigins []string
 	}
 	Security struct {
-		SecretKey string
+		PrivateKeyPath string
+		PublicKeyPath  string
 	}
 }
 
