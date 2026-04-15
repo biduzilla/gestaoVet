@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 )
 
@@ -33,7 +32,7 @@ type UserFinder interface {
 }
 
 type JWTService interface {
-	ExtractUsername(tokenString string) (string, error)
+	ExtractAuthenticatedUser(tokenString string) (interfaces.User, error)
 }
 
 type middleware struct {
@@ -148,6 +147,8 @@ func (m *middleware) EnableCORS(next http.Handler) http.Handler {
 func (m *middleware) RequireAuthenticatedUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := contexts.ContextGetUser(r)
+		fmt.Printf("token: %s\n", user)
+
 		if user.IsAnonymous() {
 			m.errHandler.AuthenticationRequiredResponse(w, r)
 			return
@@ -185,22 +186,15 @@ func (m *middleware) Authenticate(next http.Handler) http.Handler {
 		}
 
 		token := headerParts[1]
-		username, err := m.jwtService.ExtractUsername(token)
-		if err != nil || username == "" {
-			m.errHandler.InvalidAuthenticationTokenResponse(w, r)
-			return
-		}
+		user, err := m.jwtService.ExtractAuthenticatedUser(token)
 
-		auth := contexts.ContextGetUser(r)
-		if auth.GetID() != uuid.Nil {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		v := validator.New()
-		user, err := m.userFinder.FindByEmail(username, v)
 		if err != nil {
-			m.errHandler.HandlerError(w, r, err, v)
+			m.handleTokenError(w, r, err)
+			return
+		}
+
+		if user == nil {
+			m.errHandler.InvalidAuthenticationTokenResponse(w, r)
 			return
 		}
 
@@ -213,6 +207,17 @@ func (m *middleware) Authenticate(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (m *middleware) handleTokenError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case strings.Contains(err.Error(), "malformed"):
+		m.errHandler.MalFormedTokenResponse(w, r)
+	case strings.Contains(err.Error(), "expired"):
+		m.errHandler.ExpiredTokenResponse(w, r)
+	default:
+		m.errHandler.HandlerError(w, r, err, nil)
+	}
 }
 
 func (m *middleware) RequirePermission(codes []interfaces.Role) func(http.Handler) http.Handler {

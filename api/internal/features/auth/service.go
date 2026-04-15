@@ -4,9 +4,10 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"gestaoVet/internal/core/config"
-	"gestaoVet/internal/core/domain/errors"
+	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/domain/models"
 	"gestaoVet/internal/core/interfaces"
 	"gestaoVet/internal/core/validator"
@@ -55,7 +56,7 @@ func NewService(
 	}
 
 	if err := service.loadKeys(); err != nil {
-		return nil, fmt.Errorf("falha ao carregar chaves RSA: %w", err)
+		return nil, fmt.Errorf("Failed to load RSA keys.: %w", err)
 	}
 
 	return service, nil
@@ -64,46 +65,46 @@ func NewService(
 func (s *authService) loadKeys() error {
 	privateKeyData, err := os.ReadFile(s.config.Security.PrivateKeyPath)
 	if err != nil {
-		return fmt.Errorf("erro ao ler chave privada: %w", err)
+		return fmt.Errorf("Error reading private key.: %w", err)
 	}
 
 	block, _ := pem.Decode(privateKeyData)
 	if block == nil {
-		return fmt.Errorf("falha ao decodificar PEM da chave privada")
+		return fmt.Errorf("Failure to decode private key PEM")
 	}
 
 	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
 		key, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err2 != nil {
-			return fmt.Errorf("falha ao parsear chave privada: %v / %v", err, err2)
+			return fmt.Errorf("Failed to parse private key.: %v / %v", err, err2)
 		}
 		var ok bool
 		privateKey, ok = key.(*rsa.PrivateKey)
 		if !ok {
-			return fmt.Errorf("chave não é RSA")
+			return fmt.Errorf("The key is not RSA.")
 		}
 	}
 	s.privateKey = privateKey
 
 	publicKeyData, err := os.ReadFile(s.config.Security.PublicKeyPath)
 	if err != nil {
-		return fmt.Errorf("erro ao ler chave pública: %w", err)
+		return fmt.Errorf("Error reading public key.: %w", err)
 	}
 
 	block, _ = pem.Decode(publicKeyData)
 	if block == nil {
-		return fmt.Errorf("falha ao decodificar PEM da chave pública")
+		return fmt.Errorf("Failure to decode public key PEM")
 	}
 
 	publicKeyInterface, err := x509.ParsePKIXPublicKey(block.Bytes)
 	if err != nil {
-		return fmt.Errorf("falha ao parsear chave pública: %w", err)
+		return fmt.Errorf("Failed to parse public key.: %w", err)
 	}
 
 	publicKey, ok := publicKeyInterface.(*rsa.PublicKey)
 	if !ok {
-		return fmt.Errorf("chave pública não é RSA")
+		return fmt.Errorf("Public key is not RSA.")
 	}
 	s.publicKey = publicKey
 
@@ -117,16 +118,19 @@ func (s *authService) Login(
 	usuario.ValidatePasswordPlaintext(v, password)
 
 	if !v.Valid() {
-		return "", "", uuid.Nil, errors.ErrInvalidData
+		return "", "", uuid.Nil, e.ErrInvalidData
 	}
 
 	user, err := s.usuarioService.FindByEmail(email, v)
 	if err != nil {
+		if errors.Is(err, e.ErrRecordNotFound) {
+			return "", "", uuid.Nil, e.ErrInvalidCredentials
+		}
 		return "", "", uuid.Nil, err
 	}
 
 	if !user.IsAtivo {
-		return "", "", uuid.Nil, errors.ErrInactiveAccount
+		return "", "", uuid.Nil, e.ErrInactiveAccount
 	}
 
 	match, err := user.Senha.Matches(password)
@@ -135,7 +139,7 @@ func (s *authService) Login(
 	}
 
 	if !match {
-		return "", "", uuid.Nil, errors.ErrInvalidCredentials
+		return "", "", uuid.Nil, e.ErrInvalidCredentials
 	}
 
 	token, err := s.createAccessToken(user)
@@ -190,22 +194,22 @@ func (s *authService) createRefreshToken(user interfaces.User) (string, error) {
 
 func (s *authService) ExtractAuthenticatedUser(token string) (interfaces.User, error) {
 	claims, ok, err := s.extractClaims(token)
-	if !ok {
-		return nil, nil
-	}
-
 	if err != nil {
 		return nil, err
 	}
 
+	if !ok {
+		return nil, nil
+	}
+
 	userIDStr, ok := claims["user_id"].(string)
 	if !ok {
-		return nil, errors.ErrInvalidCredentials
+		return nil, nil
 	}
 
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("user_id inválido: %w", err)
+		return nil, fmt.Errorf("Invalid user_id: %w", err)
 	}
 
 	username, ok := claims["username"].(string)
@@ -234,7 +238,6 @@ func (s *authService) ExtractAuthenticatedUser(token string) (interfaces.User, e
 
 func (s *authService) extractClaims(tokenString string) (jwt.MapClaims, bool, error) {
 	token, err := s.ValidateToken(tokenString)
-
 	if err != nil {
 		return nil, false, err
 	}
@@ -265,7 +268,7 @@ func (s *authService) getRolesFromClaims(claims jwt.MapClaims) ([]int32, error) 
 				roles = append(roles, int32(r))
 			}
 		default:
-			return []int32{}, fmt.Errorf("formato de roles inválido")
+			return []int32{}, fmt.Errorf("Invalid role format")
 		}
 
 	}
@@ -276,7 +279,7 @@ func (s *authService) getRolesFromClaims(claims jwt.MapClaims) ([]int32, error) 
 func (s *authService) RefreshToken(refreshToken string) (string, error) {
 	token, err := s.ValidateToken(refreshToken)
 	if err != nil || !token.Valid {
-		return "", errors.ErrInvalidCredentials
+		return "", e.ErrInvalidCredentials
 	}
 
 	user, err := s.ExtractAuthenticatedUser(refreshToken)
@@ -290,7 +293,7 @@ func (s *authService) RefreshToken(refreshToken string) (string, error) {
 func (s *authService) ValidateToken(tokenString string) (*jwt.Token, error) {
 	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("método de assinatura inesperado: %v", t.Header["alg"])
+			return nil, fmt.Errorf("Unexpected signing method: %v", t.Header["alg"])
 		}
 
 		return s.publicKey, nil
@@ -301,7 +304,7 @@ func (s *authService) ValidateToken(tokenString string) (*jwt.Token, error) {
 	}
 
 	if !token.Valid {
-		return nil, errors.ErrInvalidCredentials
+		return nil, e.ErrInvalidCredentials
 	}
 
 	return token, nil

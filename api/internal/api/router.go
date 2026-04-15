@@ -28,9 +28,13 @@ func NewRouter(
 	db *sql.DB,
 	logger jsonlog.Logger,
 	config config.Config,
-) *Router {
+) (*Router, error) {
 	e := errors.NewErrorHandler(logger)
-	h := NewHandler(db, logger, e, config)
+	h, err := NewHandler(db, logger, e, config)
+	if err != nil {
+		return nil, err
+	}
+
 	m := middleware.New(
 		e,
 		config,
@@ -46,7 +50,7 @@ func NewRouter(
 		empresa:    empresa.NewRouter(h.Empresa, m),
 		auth:       auth.NewRouter(h.Auth, m),
 		usuario:    usuario.NewRouter(h.Usuario, m),
-	}
+	}, nil
 }
 
 func (router *Router) RegisterRoutes() *chi.Mux {

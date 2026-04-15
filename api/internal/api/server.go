@@ -15,11 +15,15 @@ import (
 func (app *application) Server() error {
 	defer app.db.Close()
 
-	r := NewRouter(
+	r, err := NewRouter(
 		app.db,
 		app.Logger,
 		app.config,
 	)
+
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", app.config.Port),
@@ -63,7 +67,7 @@ func (app *application) Server() error {
 		"addr": srv.Addr,
 	})
 
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 	if !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

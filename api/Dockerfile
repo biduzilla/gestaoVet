@@ -21,7 +21,6 @@ WORKDIR /root/
 
 COPY --from=builder /app/bin/api ./gestaoVet
 COPY --from=builder /app/bin/migrate ./migrate
-
 COPY --from=builder /app/migrations/*.sql ./migrations/
 
 RUN chmod +x /root/gestaoVet /root/migrate \

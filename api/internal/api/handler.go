@@ -22,12 +22,15 @@ func NewHandler(
 	logger jsonlog.Logger,
 	errHandler errors.ErrorHandler,
 	config config.Config,
-) *handlers {
-	s := NewServices(db, logger, config)
+) (*handlers, error) {
+	s, err := NewServices(db, logger, config)
+	if err != nil {
+		return nil, err
+	}
 	return &handlers{
 		Services: s,
 		Empresa:  empresa.NewHandler(s.EmpresaService, errHandler),
 		Auth:     auth.NewHandler(s.AuthService, errHandler),
 		Usuario:  usuario.NewHandler(s.UsuarioService, errHandler),
-	}
+	}, nil
 }

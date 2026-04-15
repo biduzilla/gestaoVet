@@ -55,7 +55,8 @@ type ConfRL struct {
 }
 
 type ConfSecurity struct {
-	SecretKey string `env:"SECRET_KEY,required"`
+	PrivateKeyPath string `env:"PRIVATE_KEY_PATH,required"`
+	PublicKeyPath  string `env:"PUBLIC_KEY_PATH,required"`
 }
 
 func New() *Conf {

@@ -35,6 +35,7 @@ services:
     volumes:
       - ./migrations:/root/migrations
       - ./config:/root/config
+      - ./resources/keys:/root/api/resources/keys
     networks:
       - api_network
 

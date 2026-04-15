@@ -35,6 +35,8 @@ type ErrorHandler interface {
 	FailedValidationResponse(w http.ResponseWriter, r *http.Request, errors map[string]string)
 	EditConflictResponse(w http.ResponseWriter, r *http.Request)
 	HandlerError(w http.ResponseWriter, r *http.Request, err error, v *validator.Validator)
+	ExpiredTokenResponse(w http.ResponseWriter, r *http.Request)
+	MalFormedTokenResponse(w http.ResponseWriter, r *http.Request)
 }
 
 var (
@@ -91,6 +93,16 @@ func ValidationAlreadyExists(field string) error {
 func (e *errorHandler) NotPermittedResponse(w http.ResponseWriter, r *http.Request) {
 	message := "your user account doesn't have the necessary permissions to access this resource"
 	e.errorHandler(w, r, http.StatusForbidden, message)
+}
+
+func (e *errorHandler) MalFormedTokenResponse(w http.ResponseWriter, r *http.Request) {
+	message := "malformed token"
+	e.errorHandler(w, r, http.StatusUnauthorized, message)
+}
+
+func (e *errorHandler) ExpiredTokenResponse(w http.ResponseWriter, r *http.Request) {
+	message := "expired token"
+	e.errorHandler(w, r, http.StatusUnauthorized, message)
 }
 
 func (e *errorHandler) AuthenticationRequiredResponse(w http.ResponseWriter, r *http.Request) {

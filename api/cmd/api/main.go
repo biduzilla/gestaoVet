@@ -18,6 +18,8 @@ func main() {
 	cfg.Limiter.RPS = c.RateLimiter.RPS
 	cfg.Limiter.Burst = c.RateLimiter.Burst
 	cfg.Limiter.Enabled = c.RateLimiter.Enabled
+	cfg.Security.PrivateKeyPath = c.Security.PrivateKeyPath
+	cfg.Security.PublicKeyPath = c.Security.PublicKeyPath
 
 	app := api.NewApp(cfg)
 	err := app.Server()
