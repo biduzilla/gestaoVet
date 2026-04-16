@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Envelope map[string]any
@@ -128,6 +129,121 @@ func ValidateTelefone(telefone string) bool {
 
 	match, _ := regexp.MatchString(`^\d{2}9\d{8}$`, telefone)
 	return match
+}
+
+func ValidateCPF(cpf string) bool {
+	cpf = regexp.MustCompile(`[^0-9]`).ReplaceAllString(cpf, "")
+
+	if len(cpf) != 11 {
+		return false
+	}
+
+	todosIguais := true
+	for i := 1; i < 11; i++ {
+		if cpf[i] != cpf[0] {
+			todosIguais = false
+			break
+		}
+	}
+	if todosIguais {
+		return false
+	}
+
+	digitos := make([]int, 11)
+	for i := range 11 {
+		digitos[i], _ = strconv.Atoi(string(cpf[i]))
+	}
+
+	soma := 0
+	for i := range 9 {
+		soma += digitos[i] * (10 - i)
+	}
+	resto := soma % 11
+	digito1 := 0
+	if resto >= 2 {
+		digito1 = 11 - resto
+	}
+	if digitos[9] != digito1 {
+		return false
+	}
+
+	soma = 0
+	for i := range 10 {
+		soma += digitos[i] * (11 - i)
+	}
+	resto = soma % 11
+	digito2 := 0
+	if resto >= 2 {
+		digito2 = 11 - resto
+	}
+	if digitos[10] != digito2 {
+		return false
+	}
+
+	return true
+}
+
+func ValidateCEP(cep string) bool {
+	// Remove caracteres não numéricos
+	cep = regexp.MustCompile(`[^0-9]`).ReplaceAllString(cep, "")
+
+	// Verifica se tem exatamente 8 dígitos
+	if len(cep) != 8 {
+		return false
+	}
+
+	// Verifica se todos os dígitos são iguais
+	todosIguais := true
+	for i := 1; i < 8; i++ {
+		if cep[i] != cep[0] {
+			todosIguais = false
+			break
+		}
+	}
+
+	return !todosIguais
+}
+
+func ValidateDate(data string) bool {
+	pattern := `^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[012])/(19|20)\d\d$`
+	matched, _ := regexp.MatchString(pattern, data)
+	if !matched {
+		return false
+	}
+
+	parts := strings.Split(data, "/")
+	if len(parts) != 3 {
+		return false
+	}
+
+	day, _ := strconv.Atoi(parts[0])
+	month, _ := strconv.Atoi(parts[1])
+	year, _ := strconv.Atoi(parts[2])
+
+	date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+
+	return date.Year() == year && int(date.Month()) == month && date.Day() == day
+}
+
+func ValidateDateISO(data string) bool {
+	pattern := `^(19|20)\d\d-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])$`
+	matched, _ := regexp.MatchString(pattern, data)
+	if !matched {
+		return false
+	}
+
+	parts := strings.Split(data, "-")
+	if len(parts) != 3 {
+		return false
+	}
+
+	year, _ := strconv.Atoi(parts[0])
+	month, _ := strconv.Atoi(parts[1])
+	day, _ := strconv.Atoi(parts[2])
+
+	date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+
+	return date.Year() == year && int(date.Month()) == month && date.Day() == day
 }
 
 func ValidateCNPJ(cnpj string) bool {
