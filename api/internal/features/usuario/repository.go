@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/jsonlog"
@@ -162,12 +161,6 @@ func (r *usuarioRepository) Insert(
 	}
 
 	query, args := repository.NamedQuery(query, params)
-
-	debugProps := map[string]string{
-		"query": utils.MinifySQL(query),
-		"args":  fmt.Sprintf("%+v", args),
-	}
-	r.logger.PrintInfo("DEBUG - Repository Insert", debugProps)
 
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
 
