@@ -10,6 +10,7 @@ import (
 	"gestaoVet/internal/core/middleware"
 	"gestaoVet/internal/features/auth"
 	"gestaoVet/internal/features/empresa"
+	"gestaoVet/internal/features/tutor"
 	"gestaoVet/internal/features/usuario"
 	"net/http"
 
@@ -22,6 +23,7 @@ type Router struct {
 	empresa    empresa.EmpresaRouter
 	auth       auth.AuthRouter
 	usuario    usuario.UsuarioRouter
+	tutor      tutor.TutorRouter
 }
 
 func NewRouter(
@@ -49,7 +51,7 @@ func NewRouter(
 		errHandler: e,
 		empresa:    empresa.NewRouter(h.Empresa, m),
 		auth:       auth.NewRouter(h.Auth, m),
-		usuario:    usuario.NewRouter(h.Usuario, m),
+		tutor:      tutor.NewRouter(h.Tutor, m),
 	}, nil
 }
 
@@ -75,6 +77,7 @@ func (router *Router) RegisterRoutes() *chi.Mux {
 		router.empresa.Routes(r)
 		router.auth.Routes(r)
 		router.usuario.Routes(r)
+		router.tutor.Routes(r)
 	})
 
 	return r
