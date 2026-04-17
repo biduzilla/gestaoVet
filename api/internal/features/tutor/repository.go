@@ -102,7 +102,7 @@ func (r *tutorRepository) FindAll(
 
 	query := `
 			(
-				search is null
+				(:search is null or :search = '')
 				or to_tsvector('simple', t.nome) @@ plainto_tsquery('simple', :search)
 				or to_tsvector('simple', t.cpf) @@ plainto_tsquery('simple', :search)
 				or to_tsvector('simple', t.telefone1) @@ plainto_tsquery('simple', :search) 

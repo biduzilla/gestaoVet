@@ -9,8 +9,8 @@ import (
 )
 
 type Repositories struct {
-	Empresa empresa.EmpresaRepository
-	Usuario usuario.UsuarioRepository
+	empresa.EmpresaRepository
+	usuario.UsuarioRepository
 	tutor.TutorRepository
 }
 
@@ -19,8 +19,8 @@ func NewRepository(
 	logger jsonlog.Logger,
 ) *Repositories {
 	return &Repositories{
-		Empresa:         empresa.NewRepository(db, logger),
-		Usuario:         usuario.NewRepository(db, logger),
-		TutorRepository: tutor.NewRepository(db, logger),
+		EmpresaRepository: empresa.NewRepository(db, logger),
+		UsuarioRepository: usuario.NewRepository(db, logger),
+		TutorRepository:   tutor.NewRepository(db, logger),
 	}
 }

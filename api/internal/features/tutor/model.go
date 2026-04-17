@@ -56,7 +56,7 @@ type TutorDTO struct {
 	Version     *int       `json:"version"`
 }
 
-func (t Tutor) ToDTO() *TutorDTO {
+func (t Tutor) toDTO() *TutorDTO {
 	return &TutorDTO{
 		ID:          &t.ID,
 		Nome:        &t.Nome,
@@ -82,7 +82,7 @@ func (t Tutor) ToDTO() *TutorDTO {
 	}
 }
 
-func (d TutorDTO) ToModel(v *validator.Validator) (*Tutor, error) {
+func (d TutorDTO) toModel(v *validator.Validator) (*Tutor, error) {
 	var model Tutor
 
 	if d.ID != nil {
