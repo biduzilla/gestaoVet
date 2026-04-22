@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"gestaoVet/internal/core/contexts"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/internal/core/repository"
 	"gestaoVet/utils"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -23,49 +23,51 @@ type usuarioRepository struct {
 
 type UsuarioRepository interface {
 	FindByEmail(
+		ctx context.Context,
 		email string,
 	) (*Usuario, error)
 
 	FindByID(
+		ctx context.Context,
 		ID uuid.UUID,
-		cnpj string,
 	) (*Usuario, error)
 
 	FindAll(
+		ctx context.Context,
 		nome, telefone, email, cnpj string,
 		f filters.Filters,
 	) ([]*Usuario, filters.Metadata, error)
 
 	Insert(
+		ctx context.Context,
 		tx *sql.Tx,
 		model *Usuario,
 	) error
 
 	Update(
+		ctx context.Context,
 		tx *sql.Tx,
 		model *Usuario,
-		cnpj string,
-		ID uuid.UUID,
 	) error
 
 	UpdateSenha(
+		ctx context.Context,
 		tx *sql.Tx,
 		model *Usuario,
-		cnpj string,
-		ID uuid.UUID,
+
 	) error
 
-	Delete(tx *sql.Tx,
-		id,
-		userID uuid.UUID,
-		cnpj string,
+	Delete(
+		ctx context.Context,
+		tx *sql.Tx,
+		id uuid.UUID,
 	) error
 }
 
 func NewRepository(
 	db *sql.DB,
 	logger jsonlog.Logger,
-) *usuarioRepository {
+) UsuarioRepository {
 	return &usuarioRepository{
 		db:             db,
 		logger:         logger,
@@ -88,23 +90,26 @@ func parseUserConstraintError(err error) error {
 }
 
 func (r *usuarioRepository) FindByEmail(
+	ctx context.Context,
 	email string,
 ) (*Usuario, error) {
-	return r.baseRepository.FindOne("u.email = :email", map[string]any{"email": email})
+	return r.baseRepository.FindOne(ctx, "u.email = :email", map[string]any{"email": email})
 }
 
 func (r *usuarioRepository) FindByID(
+	ctx context.Context,
 	ID uuid.UUID,
-	cnpj string,
 ) (*Usuario, error) {
+	user := contexts.ContextGetUser(ctx)
 	params := map[string]any{
 		"id":   ID,
-		"cnpj": cnpj,
+		"cnpj": user.GetCNPJ(),
 	}
-	return r.baseRepository.FindOne("u.id = :id and u.cnpj = :cnpj", params)
+	return r.baseRepository.FindOne(ctx, "u.id = :id and u.cnpj = :cnpj", params)
 }
 
 func (r *usuarioRepository) FindAll(
+	ctx context.Context,
 	nome, telefone, email, cnpj string,
 	f filters.Filters,
 ) ([]*Usuario, filters.Metadata, error) {
@@ -121,10 +126,11 @@ func (r *usuarioRepository) FindAll(
 			and u.deleted = false
 			and u.cnpj = :cnpj
 	`
-	return r.baseRepository.FindWithFilters(f, query, params)
+	return r.baseRepository.FindWithFilters(ctx, f, query, params)
 }
 
 func (r *usuarioRepository) Insert(
+	ctx context.Context,
 	tx *sql.Tx,
 	model *Usuario,
 ) error {
@@ -164,9 +170,6 @@ func (r *usuarioRepository) Insert(
 
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
 	err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&model.ID,
 		&model.CreatedAt,
@@ -185,11 +188,11 @@ func (r *usuarioRepository) Insert(
 }
 
 func (r *usuarioRepository) Update(
+	ctx context.Context,
 	tx *sql.Tx,
 	model *Usuario,
-	cnpj string,
-	ID uuid.UUID,
 ) error {
+	user := contexts.ContextGetUser(ctx)
 	query := `
 	update usuarios
 	set
@@ -212,9 +215,9 @@ func (r *usuarioRepository) Update(
 	params := map[string]any{
 		"nome":     model.Nome,
 		"telefone": model.Telefone,
-		"cnpj":     cnpj,
+		"cnpj":     user.GetCNPJ(),
 		"email":    model.Email,
-		"ID":       ID,
+		"ID":       user.GetID(),
 		"version":  model.Version,
 		"roles":    model.Roles,
 		"userId":   model.ID,
@@ -222,9 +225,6 @@ func (r *usuarioRepository) Update(
 
 	query, args := repository.NamedQuery(query, params)
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
 
 	err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&model.Version,
@@ -242,11 +242,12 @@ func (r *usuarioRepository) Update(
 }
 
 func (r *usuarioRepository) UpdateSenha(
+	ctx context.Context,
 	tx *sql.Tx,
 	model *Usuario,
-	cnpj string,
-	ID uuid.UUID,
 ) error {
+	user := contexts.ContextGetUser(ctx)
+
 	query := `
 	update usuarios
 	set
@@ -263,17 +264,14 @@ func (r *usuarioRepository) UpdateSenha(
 
 	params := map[string]any{
 		"senha":   model.Senha.Hash,
-		"cnpj":    cnpj,
-		"ID":      ID,
+		"cnpj":    user.GetCNPJ(),
+		"ID":      user.GetID(),
 		"version": model.Version,
 		"userId":  model.ID,
 	}
 
 	query, args := repository.NamedQuery(query, params)
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
 
 	result, err := tx.ExecContext(ctx, query, args...)
 
@@ -293,16 +291,22 @@ func (r *usuarioRepository) UpdateSenha(
 	return nil
 }
 
-func (r *usuarioRepository) Delete(tx *sql.Tx, id, userID uuid.UUID, cnpj string) error {
+func (r *usuarioRepository) Delete(
+	ctx context.Context,
+	tx *sql.Tx,
+	id uuid.UUID,
+) error {
+	user := contexts.ContextGetUser(ctx)
+
 	params := map[string]any{
 		"id":     id,
-		"userID": userID,
-		"cnpj":   cnpj,
+		"userID": user.GetID(),
+		"cnpj":   user.GetCNPJ(),
 	}
 
 	query := `
 		id = :id
 		and cnpj = :cnpj
 	`
-	return r.baseRepository.DeleteByQuery(tx, query, params)
+	return r.baseRepository.DeleteByQuery(ctx, tx, query, params)
 }

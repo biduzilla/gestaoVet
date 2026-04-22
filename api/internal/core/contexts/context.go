@@ -15,8 +15,8 @@ func ContextSetUser(r *http.Request, user interfaces.User) *http.Request {
 	return r.WithContext(ctx)
 }
 
-func ContextGetUser(r *http.Request) interfaces.User {
-	user, ok := r.Context().Value(userContextKey).(interfaces.User)
+func ContextGetUser(ctx context.Context) interfaces.User {
+	user, ok := ctx.Value(userContextKey).(interfaces.User)
 	if !ok {
 		panic("missing user value in request context")
 	}

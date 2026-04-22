@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"expvar"
 	"fmt"
 	"gestaoVet/internal/core/config"
@@ -8,7 +9,6 @@ import (
 	"gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/interfaces"
 	"gestaoVet/internal/core/jsonlog"
-	"gestaoVet/internal/core/validator"
 	"net"
 	"net/http"
 	"slices"
@@ -27,17 +27,12 @@ var (
 	totalResponsesSentByStatus      = expvar.NewMap("total_responses_sent_by_status")
 )
 
-type UserFinder interface {
-	FindByEmail(email string, v *validator.Validator) (interfaces.User, error)
-}
-
 type JWTService interface {
 	ExtractAuthenticatedUser(tokenString string) (interfaces.User, error)
 }
 
 type middleware struct {
 	errHandler errors.ErrorHandler
-	userFinder UserFinder
 	jwtService JWTService
 	config     config.Config
 	logger     jsonlog.Logger
@@ -53,17 +48,16 @@ type Middleware interface {
 	RecoverPanic(next http.Handler) http.Handler
 	Logging(next http.Handler) http.Handler
 	RequirePermission(codes []interfaces.Role) func(http.Handler) http.Handler
+	TimeoutMiddleWare(next http.Handler) http.Handler
 }
 
 func New(
 	errHandler errors.ErrorHandler,
 	config config.Config,
-	userFinder UserFinder,
 	jwtService JWTService,
 	logger jsonlog.Logger,
 ) *middleware {
 	return &middleware{
-		userFinder: userFinder,
 		jwtService: jwtService,
 		errHandler: errHandler,
 		config:     config,
@@ -146,7 +140,7 @@ func (m *middleware) EnableCORS(next http.Handler) http.Handler {
 
 func (m *middleware) RequireAuthenticatedUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user := contexts.ContextGetUser(r)
+		user := contexts.ContextGetUser(r.Context())
 		fmt.Printf("token: %s\n", user)
 
 		if user.IsAnonymous() {
@@ -159,7 +153,7 @@ func (m *middleware) RequireAuthenticatedUser(next http.Handler) http.Handler {
 
 func (m *middleware) RequireActivatedUser(next http.Handler) http.Handler {
 	return m.RequireAuthenticatedUser(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user := contexts.ContextGetUser(r)
+		user := contexts.ContextGetUser(r.Context())
 		if !user.GetIsAtivo() {
 			m.errHandler.InactiveAccountResponse(w, r)
 			return
@@ -216,7 +210,7 @@ func (m *middleware) handleTokenError(w http.ResponseWriter, r *http.Request, er
 	case strings.Contains(err.Error(), "expired"):
 		m.errHandler.ExpiredTokenResponse(w, r)
 	default:
-		m.errHandler.HandlerError(w, r, err, nil)
+		m.errHandler.HandlerError(w, r, err)
 	}
 }
 
@@ -224,7 +218,7 @@ func (m *middleware) RequirePermission(codes []interfaces.Role) func(http.Handle
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			user := contexts.ContextGetUser(r)
+			user := contexts.ContextGetUser(r.Context())
 
 			permissions := user.GetRoles()
 
@@ -327,5 +321,15 @@ func (m *middleware) Logging(next http.Handler) http.Handler {
 			"status":   http.StatusText(mw.statusCode),
 			"duration": time.Since(start).String(),
 		})
+	})
+}
+
+func (m *middleware) TimeoutMiddleWare(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		r = r.WithContext(ctx)
+		next.ServeHTTP(w, r)
 	})
 }

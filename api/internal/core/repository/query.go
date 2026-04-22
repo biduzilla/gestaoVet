@@ -8,7 +8,6 @@ import (
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"strings"
-	"time"
 )
 
 func NamedQuery(query string, params map[string]any) (string, []any) {
@@ -27,14 +26,12 @@ func NamedQuery(query string, params map[string]any) (string, []any) {
 }
 
 func ListQuery[T any](
+	ctx context.Context,
 	db *sql.DB,
 	query string,
 	args []any,
 	factory FactoryFunc[T],
 ) ([]*T, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -67,15 +64,13 @@ func ListQuery[T any](
 }
 
 func PaginatedQuery[T any](
+	ctx context.Context,
 	db *sql.DB,
 	query string,
 	args []any,
 	f filters.Filters,
 	factory FactoryFunc[T],
 ) ([]*T, filters.Metadata, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
 	rows, err := db.QueryContext(ctx, query, args...)
 
 	if err != nil {
@@ -116,13 +111,11 @@ func PaginatedQuery[T any](
 }
 
 func GetByQuery[T any](
+	ctx context.Context,
 	db *sql.DB,
 	query string,
 	args []any,
 ) (*T, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
 	var model T
 	row := db.QueryRowContext(ctx, query, args...)
 	err := ScanStruct(row, &model)

@@ -1,6 +1,7 @@
 package empresa
 
 import (
+	"context"
 	"database/sql"
 	"gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/domain/models"
@@ -9,8 +10,6 @@ import (
 	"gestaoVet/internal/core/validator"
 	"gestaoVet/internal/features/usuario"
 	"gestaoVet/utils"
-
-	"github.com/google/uuid"
 )
 
 type empresaService struct {
@@ -33,58 +32,76 @@ func NewService(
 
 type EmpresaService interface {
 	FindAll(
+		ctx context.Context,
 		cnpj, nomeFantasia, razaoSocial, email string,
 		f filters.Filters,
 	) ([]*Empresa, filters.Metadata, error)
-	FindByCnpj(cnpj string) (*Empresa, error)
-	Save(model *Empresa, v *validator.Validator) error
-	Update(model *Empresa, v *validator.Validator, userID uuid.UUID, cnpj string) error
-	Delete(cnpj string, userID uuid.UUID) error
+	FindByCnpj(ctx context.Context, cnpj string) (*Empresa, error)
+	Save(ctx context.Context,
+		model *Empresa,
+	) error
+	Update(ctx context.Context,
+		model *Empresa,
+	) error
+	Delete(ctx context.Context) error
 }
 
 func (s *empresaService) FindAll(
+	ctx context.Context,
 	cnpj, nomeFantasia, razaoSocial, email string,
 	f filters.Filters,
 ) ([]*Empresa, filters.Metadata, error) {
-	return s.repository.FindAll(cnpj, nomeFantasia, razaoSocial, email, f)
+	return s.repository.FindAll(ctx, cnpj, nomeFantasia, razaoSocial, email, f)
 }
 
-func (s *empresaService) Save(model *Empresa, v *validator.Validator) error {
+func (s *empresaService) Save(
+	ctx context.Context,
+	model *Empresa,
+) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+		v := validator.New()
 		if model.Validate(v); !v.Valid() {
-			return errors.ErrInvalidData
+			return errors.NewValidationError(v.Errors)
 		}
 
-		err := s.repository.Insert(tx, model)
+		err := s.repository.Insert(ctx, tx, model)
 		if err != nil {
 			return err
 		}
 
-		return s.createUserAdmin(model, v, tx)
+		return s.createUserAdmin(ctx, model, tx)
 	})
 }
 
-func (s *empresaService) Update(model *Empresa, v *validator.Validator, userID uuid.UUID, cnpj string) error {
+func (s *empresaService) Update(
+	ctx context.Context,
+	model *Empresa,
+) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+		v := validator.New()
 		if model.Validate(v); !v.Valid() {
-			return errors.ErrInvalidData
+			return errors.NewValidationError(v.Errors)
 		}
 
-		return s.repository.Update(tx, model, userID, cnpj)
+		return s.repository.Update(ctx, tx, model)
 	})
 }
 
-func (s *empresaService) FindByCnpj(cnpj string) (*Empresa, error) {
-	return s.repository.FindByCnpj(cnpj)
+func (s *empresaService) FindByCnpj(ctx context.Context, cnpj string) (*Empresa, error) {
+	return s.repository.FindByCnpj(ctx, cnpj)
 }
 
-func (s *empresaService) Delete(cnpj string, userID uuid.UUID) error {
+func (s *empresaService) Delete(ctx context.Context) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
-		return s.repository.Delete(tx, cnpj, userID)
+		return s.repository.Delete(ctx, tx)
 	})
 }
 
-func (s *empresaService) createUserAdmin(model *Empresa, v *validator.Validator, tx *sql.Tx) error {
+func (s *empresaService) createUserAdmin(
+	ctx context.Context,
+	model *Empresa,
+	tx *sql.Tx,
+) error {
 	var user = usuario.Usuario{
 		Nome:     model.RazaoSocial,
 		Telefone: model.Telefone,
@@ -95,5 +112,5 @@ func (s *empresaService) createUserAdmin(model *Empresa, v *validator.Validator,
 		Roles: []int32{int32(interfaces.ROLE_ADMIN)},
 	}
 	user.Senha.Set(model.Cnpj)
-	return s.usuarioService.Save(v, &user, tx)
+	return s.usuarioService.Save(ctx, &user, tx)
 }

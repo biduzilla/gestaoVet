@@ -1,7 +1,6 @@
 package tutor
 
 import (
-	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/domain/models"
 	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
@@ -82,7 +81,7 @@ func (t Tutor) toDTO() *TutorDTO {
 	}
 }
 
-func (d TutorDTO) toModel(v *validator.Validator) (*Tutor, error) {
+func (d TutorDTO) ToModel() *Tutor {
 	var model Tutor
 
 	if d.ID != nil {
@@ -110,10 +109,6 @@ func (d TutorDTO) toModel(v *validator.Validator) (*Tutor, error) {
 	}
 
 	if d.CPF != nil {
-		v.Check(utils.ValidateCPF(*d.CPF), "cpf", "invalid cpf format")
-		if !v.Valid() {
-			return nil, e.ErrInvalidData
-		}
 		model.CPF = *d.CPF
 	}
 
@@ -166,10 +161,6 @@ func (d TutorDTO) toModel(v *validator.Validator) (*Tutor, error) {
 	}
 
 	if d.Cnpj != nil {
-		v.Check(utils.ValidateCNPJ(*d.Cnpj), "cnpj", "invalid cnpj format")
-		if !v.Valid() {
-			return nil, e.ErrInvalidData
-		}
 		model.Cnpj = *d.Cnpj
 	}
 
@@ -177,7 +168,7 @@ func (d TutorDTO) toModel(v *validator.Validator) (*Tutor, error) {
 		model.Version = *d.Version
 	}
 
-	return &model, nil
+	return &model
 }
 
 func (t *Tutor) Validate(v *validator.Validator) {

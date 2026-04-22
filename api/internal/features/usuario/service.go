@@ -1,6 +1,7 @@
 package usuario
 
 import (
+	"context"
 	"database/sql"
 	"gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
@@ -18,52 +19,47 @@ type usuarioService struct {
 
 type UsuarioService interface {
 	FindByEmail(
+		ctx context.Context,
 		email string,
-		v *validator.Validator,
 	) (*Usuario, error)
 
 	FindByID(
+		ctx context.Context,
 		ID uuid.UUID,
-		cnpj string,
 	) (*Usuario, error)
 
 	FindAll(
+		ctx context.Context,
 		nome, telefone, email, cnpj string,
 		f filters.Filters,
 	) ([]*Usuario, filters.Metadata, error)
 
 	Save(
-		v *validator.Validator,
+		ctx context.Context,
 		model *Usuario,
 		tx *sql.Tx,
 	) error
 
 	Update(
-		v *validator.Validator,
+		ctx context.Context,
 		model *Usuario,
-		cnpj string,
-		ID uuid.UUID,
 	) error
 
 	UpdateRoles(
-		v *validator.Validator,
+		ctx context.Context,
 		userID uuid.UUID,
 		roles []int32,
-		cnpj string,
-		ID uuid.UUID,
 	) error
 
 	UpdateSenha(
+		ctx context.Context,
 		userID uuid.UUID,
 		senha string,
-		cnpj string,
-		ID uuid.UUID,
 	) error
 
 	Delete(
-		id,
-		userID uuid.UUID,
-		cnpj string,
+		ctx context.Context,
+		id uuid.UUID,
 	) error
 }
 
@@ -78,42 +74,44 @@ func NewService(
 }
 
 func (s *usuarioService) FindByEmail(
+	ctx context.Context,
 	email string,
-	v *validator.Validator,
 ) (*Usuario, error) {
-
+	v := validator.New()
 	if ValidateEmail(v, email); !v.Valid() {
 		return nil, errors.ErrInvalidData
 	}
-	return s.repository.FindByEmail(email)
+	return s.repository.FindByEmail(ctx, email)
 }
 
 func (s *usuarioService) FindByID(
+	ctx context.Context,
 	ID uuid.UUID,
-	cnpj string,
 ) (*Usuario, error) {
-	return s.repository.FindByID(ID, cnpj)
+	return s.repository.FindByID(ctx, ID)
 }
 
 func (s *usuarioService) FindAll(
+	ctx context.Context,
 	nome, telefone, email, cnpj string,
 	f filters.Filters,
 ) ([]*Usuario, filters.Metadata, error) {
-	return s.repository.FindAll(nome, telefone, email, cnpj, f)
+	return s.repository.FindAll(ctx, nome, telefone, email, cnpj, f)
 }
 
 func (s *usuarioService) Save(
-	v *validator.Validator,
+	ctx context.Context,
 	model *Usuario,
 	tx *sql.Tx,
 ) error {
 	saveLogic := func(tx *sql.Tx) error {
+		v := validator.New()
 		if model.Validate(v); !v.Valid() {
-			return errors.ErrInvalidData
+			return errors.NewValidationError(v.Errors)
 		}
 
 		model.Roles = append(model.Roles, int32(interfaces.ROLE_RECEPTIONIST))
-		return s.repository.Insert(tx, model)
+		return s.repository.Insert(ctx, tx, model)
 	}
 
 	if tx != nil {
@@ -124,61 +122,56 @@ func (s *usuarioService) Save(
 }
 
 func (s *usuarioService) UpdateRoles(
-	v *validator.Validator,
+	ctx context.Context,
 	userID uuid.UUID,
 	roles []int32,
-	cnpj string,
-	ID uuid.UUID,
 ) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
-		user, err := s.FindByID(userID, cnpj)
+		user, err := s.FindByID(ctx, userID)
 		if err != nil {
 			return err
 		}
 
 		user.Roles = roles
 		user.SetRolesReplace()
-		return s.Update(v, user, cnpj, ID)
+		return s.Update(ctx, user)
 	})
 }
 
 func (s *usuarioService) Update(
-	v *validator.Validator,
+	ctx context.Context,
 	model *Usuario,
-	cnpj string,
-	ID uuid.UUID,
 ) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+		v := validator.New()
 		if model.Validate(v); !v.Valid() {
-			return errors.ErrInvalidData
+			return errors.NewValidationError(v.Errors)
 		}
 
-		return s.repository.Update(tx, model, cnpj, ID)
+		return s.repository.Update(ctx, tx, model)
 	})
 }
 
 func (s *usuarioService) UpdateSenha(
+	ctx context.Context,
 	userID uuid.UUID,
 	senha string,
-	cnpj string,
-	ID uuid.UUID,
 ) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
-		user, err := s.FindByID(userID, cnpj)
+		user, err := s.FindByID(ctx, userID)
 		if err != nil {
 			return err
 		}
 		user.Senha.Set(senha)
-		return s.repository.UpdateSenha(tx, user, cnpj, ID)
+		return s.repository.UpdateSenha(ctx, tx, user)
 	})
 }
 
 func (s *usuarioService) Delete(
-	id,
-	userID uuid.UUID,
-	cnpj string,
+	ctx context.Context,
+	id uuid.UUID,
 ) error {
 	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
-		return s.repository.Delete(tx, id, userID, cnpj)
+		return s.repository.Delete(ctx, tx, id)
 	})
 }

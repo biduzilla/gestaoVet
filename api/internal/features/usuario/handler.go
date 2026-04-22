@@ -1,7 +1,6 @@
 package usuario
 
 import (
-	"gestaoVet/internal/core/contexts"
 	"gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/handler"
 	"gestaoVet/internal/core/validator"
@@ -35,19 +34,19 @@ func NewHandler(
 }
 
 func (h *usuarioHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
-	v := validator.New()
 	cnpj := handler.ReadStringParam(r, "cnpj", "")
 	telefone := handler.ReadStringParam(r, "telefone", "")
 	nome := handler.ReadStringParam(r, "nome", "")
 	email := handler.ReadStringParam(r, "email", "")
 
-	f, err := handler.GetFilters(r, v, []string{"id", "nome", "-id", "-nome"})
+	f, err := handler.GetFilters(r, []string{"id", "nome", "-id", "-nome"})
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
 	models, metadata, err := h.service.FindAll(
+		r.Context(),
 		nome,
 		telefone,
 		email,
@@ -56,7 +55,7 @@ func (h *usuarioHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -84,10 +83,9 @@ func (h *usuarioHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := contexts.ContextGetUser(r)
-	model, err := h.service.FindByID(id, user.GetCNPJ())
+	model, err := h.service.FindByID(r.Context(), id)
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, nil)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -107,15 +105,14 @@ func (h *usuarioHandler) Save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := validator.New()
-	model, err := dto.toModel(v)
+	model, err := dto.toModel()
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
-	if err := h.service.Save(v, model, nil); err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+	if err := h.service.Save(r.Context(), model, nil); err != nil {
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -129,16 +126,14 @@ func (h *usuarioHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := validator.New()
-	user := contexts.ContextGetUser(r)
-	model, err := dto.toModel(v)
+	model, err := dto.toModel()
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
-	if err := h.service.Update(v, model, user.GetCNPJ(), user.GetID()); err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+	if err := h.service.Update(r.Context(), model); err != nil {
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -162,10 +157,8 @@ func (h *usuarioHandler) UpdateSenha(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := contexts.ContextGetUser(r)
-
-	if err := h.service.UpdateSenha(*dto.ID, *dto.Senha, user.GetCNPJ(), user.GetID()); err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+	if err := h.service.UpdateSenha(r.Context(), *dto.ID, *dto.Senha); err != nil {
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -180,11 +173,8 @@ func (h *usuarioHandler) UpdateRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := validator.New()
-	user := contexts.ContextGetUser(r)
-
-	if err := h.service.UpdateRoles(v, dto.ID, dto.Roles, user.GetCNPJ(), user.GetID()); err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+	if err := h.service.UpdateRoles(r.Context(), dto.ID, dto.Roles); err != nil {
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -197,9 +187,8 @@ func (h *usuarioHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := contexts.ContextGetUser(r)
-	if err := h.service.Delete(id, user.GetID(), user.GetCNPJ()); err != nil {
-		h.errHandler.HandlerError(w, r, err, nil)
+	if err := h.service.Delete(r.Context(), id); err != nil {
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -36,7 +37,7 @@ const (
 
 type AuthService interface {
 	Login(
-		v *validator.Validator,
+		ctx context.Context,
 		email, password string,
 	) (string, string, uuid.UUID, error)
 
@@ -112,16 +113,18 @@ func (s *authService) loadKeys() error {
 }
 
 func (s *authService) Login(
-	v *validator.Validator,
+	ctx context.Context,
 	email, password string,
 ) (string, string, uuid.UUID, error) {
+	v := validator.New()
+
 	usuario.ValidatePasswordPlaintext(v, password)
 
 	if !v.Valid() {
-		return "", "", uuid.Nil, e.ErrInvalidData
+		return "", "", uuid.Nil, e.NewValidationError(v.Errors)
 	}
 
-	user, err := s.usuarioService.FindByEmail(email, v)
+	user, err := s.usuarioService.FindByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, e.ErrRecordNotFound) {
 			return "", "", uuid.Nil, e.ErrInvalidCredentials

@@ -3,7 +3,6 @@ package auth
 import (
 	"gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/handler"
-	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
 	"net/http"
 )
@@ -40,11 +39,10 @@ func (h *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := validator.New()
-	accessToken, refreshToken, userID, err := h.service.Login(v, input.Email, input.Password)
+	accessToken, refreshToken, userID, err := h.service.Login(r.Context(), input.Email, input.Password)
 
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -73,11 +71,10 @@ func (h *authHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := validator.New()
 	accessToken, err := h.service.RefreshToken(input.RefreshToken)
 
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 

@@ -9,21 +9,21 @@ import (
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/utils"
 	"strings"
-	"time"
 )
 
 type BaseRepository[T any] interface {
-	FindById(id any) (*T, error)
-	Find(query string, params map[string]any) ([]*T, error)
-	FindOne(query string, params map[string]any) (*T, error)
+	FindById(ctx context.Context, id any) (*T, error)
+	Find(ctx context.Context, query string, params map[string]any) ([]*T, error)
+	FindOne(ctx context.Context, query string, params map[string]any) (*T, error)
 	FindWithFilters(
+		ctx context.Context,
 		f filters.Filters,
 		query string,
 		params map[string]any,
 	) ([]*T, filters.Metadata, error)
-	DeleteByQuery(tx *sql.Tx, query string, params map[string]any) error
-	Count(query string, params map[string]any) (int64, error)
-	Exists(query string, params map[string]any) (bool, error)
+	DeleteByQuery(ctx context.Context, tx *sql.Tx, query string, params map[string]any) error
+	Count(ctx context.Context, query string, params map[string]any) (int64, error)
+	Exists(ctx context.Context, query string, params map[string]any) (bool, error)
 }
 
 type baseRepository[T any] struct {
@@ -47,7 +47,7 @@ func NewBaseRepository[T any](
 	}
 }
 
-func (r *baseRepository[T]) Exists(query string, params map[string]any) (bool, error) {
+func (r *baseRepository[T]) Exists(ctx context.Context, query string, params map[string]any) (bool, error) {
 	if strings.TrimSpace(query) == "" {
 		query = "1 = 1"
 	}
@@ -64,11 +64,11 @@ func (r *baseRepository[T]) Exists(query string, params map[string]any) (bool, e
 	r.logger.PrintInfo(utils.MinifySQL(namedQuery), nil)
 
 	var exists bool
-	err := r.db.QueryRow(namedQuery, args...).Scan(&exists)
+	err := r.db.QueryRowContext(ctx, namedQuery, args...).Scan(&exists)
 	return exists, err
 }
 
-func (r *baseRepository[T]) FindById(id any) (*T, error) {
+func (r *baseRepository[T]) FindById(ctx context.Context, id any) (*T, error) {
 	query := fmt.Sprintf(`
 	select %s
 	from %s
@@ -79,10 +79,10 @@ func (r *baseRepository[T]) FindById(id any) (*T, error) {
 
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
 
-	return GetByQuery[T](r.db, query, []any{id})
+	return GetByQuery[T](ctx, r.db, query, []any{id})
 }
 
-func (r *baseRepository[T]) Find(query string, params map[string]any) ([]*T, error) {
+func (r *baseRepository[T]) Find(ctx context.Context, query string, params map[string]any) ([]*T, error) {
 	finalQuery := fmt.Sprintf(`
 	select %s
 	from %s as %s
@@ -94,10 +94,10 @@ func (r *baseRepository[T]) Find(query string, params map[string]any) ([]*T, err
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
 
-	return ListQuery(r.db, queryStr, args, r.factory)
+	return ListQuery(ctx, r.db, queryStr, args, r.factory)
 }
 
-func (r *baseRepository[T]) FindOne(query string, params map[string]any) (*T, error) {
+func (r *baseRepository[T]) FindOne(ctx context.Context, query string, params map[string]any) (*T, error) {
 	finalQuery := fmt.Sprintf(`
 	select %s
 	from %s as %s
@@ -110,10 +110,10 @@ func (r *baseRepository[T]) FindOne(query string, params map[string]any) (*T, er
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
 
-	return GetByQuery[T](r.db, queryStr, args)
+	return GetByQuery[T](ctx, r.db, queryStr, args)
 }
 
-func (r *baseRepository[T]) Count(query string, params map[string]any) (int64, error) {
+func (r *baseRepository[T]) Count(ctx context.Context, query string, params map[string]any) (int64, error) {
 	finalQuery := fmt.Sprintf(`
         SELECT COUNT(*)
         FROM %s as %s
@@ -124,11 +124,12 @@ func (r *baseRepository[T]) Count(query string, params map[string]any) (int64, e
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
 
 	var count int64
-	err := r.db.QueryRow(queryStr, args...).Scan(&count)
+	err := r.db.QueryRowContext(ctx, queryStr, args...).Scan(&count)
 	return count, err
 }
 
 func (r *baseRepository[T]) FindWithFilters(
+	ctx context.Context,
 	f filters.Filters,
 	query string,
 	params map[string]any,
@@ -149,10 +150,10 @@ func (r *baseRepository[T]) FindWithFilters(
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
 
-	return PaginatedQuery(r.db, queryStr, args, f, r.factory)
+	return PaginatedQuery(ctx, r.db, queryStr, args, f, r.factory)
 }
 
-func (r *baseRepository[T]) DeleteByQuery(tx *sql.Tx, query string, params map[string]any) error {
+func (r *baseRepository[T]) DeleteByQuery(ctx context.Context, tx *sql.Tx, query string, params map[string]any) error {
 	finalQuery := fmt.Sprintf(`
 	UPDATE %s set
 		deleted = true,
@@ -165,9 +166,6 @@ func (r *baseRepository[T]) DeleteByQuery(tx *sql.Tx, query string, params map[s
 
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
 
 	result, err := tx.ExecContext(ctx, queryStr, args...)
 	if err != nil {

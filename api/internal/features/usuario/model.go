@@ -2,7 +2,6 @@ package usuario
 
 import (
 	"errors"
-	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/domain/models"
 	"gestaoVet/internal/core/interfaces"
 	"gestaoVet/internal/core/validator"
@@ -63,7 +62,7 @@ func (m Usuario) toDTO() *UsuarioDTO {
 	}
 }
 
-func (d UsuarioDTO) toModel(v *validator.Validator) (*Usuario, error) {
+func (d UsuarioDTO) toModel() (*Usuario, error) {
 	var model Usuario
 
 	if d.ID != nil {
@@ -83,10 +82,6 @@ func (d UsuarioDTO) toModel(v *validator.Validator) (*Usuario, error) {
 	}
 
 	if d.Cnpj != nil {
-		v.Check(utils.ValidateCNPJ(*d.Cnpj), "cnpj", "invalid cnpj format")
-		if !v.Valid() {
-			return nil, e.ErrInvalidData
-		}
 		model.Cnpj = *d.Cnpj
 	}
 
@@ -95,11 +90,6 @@ func (d UsuarioDTO) toModel(v *validator.Validator) (*Usuario, error) {
 	}
 
 	if d.Senha != nil {
-		ValidatePasswordPlaintext(v, *d.Senha)
-		if !v.Valid() {
-			return nil, e.ErrInvalidData
-		}
-
 		err := model.Senha.Set(*d.Senha)
 		if err != nil {
 			return nil, err

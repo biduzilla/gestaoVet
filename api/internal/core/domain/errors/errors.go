@@ -1,10 +1,10 @@
 package errors
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"gestaoVet/internal/core/jsonlog"
-	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
 	"net/http"
 	"strings"
@@ -12,6 +12,14 @@ import (
 
 type errorHandler struct {
 	logger jsonlog.Logger
+}
+
+type ValidationError struct {
+	FieldErrors map[string]string
+}
+
+func (e *ValidationError) Error() string {
+	return "validation failed"
 }
 
 func NewErrorHandler(logger jsonlog.Logger) *errorHandler {
@@ -34,9 +42,10 @@ type ErrorHandler interface {
 	BadRequestResponse(w http.ResponseWriter, r *http.Request, err error)
 	FailedValidationResponse(w http.ResponseWriter, r *http.Request, errors map[string]string)
 	EditConflictResponse(w http.ResponseWriter, r *http.Request)
-	HandlerError(w http.ResponseWriter, r *http.Request, err error, v *validator.Validator)
+	HandlerError(w http.ResponseWriter, r *http.Request, err error)
 	ExpiredTokenResponse(w http.ResponseWriter, r *http.Request)
 	MalFormedTokenResponse(w http.ResponseWriter, r *http.Request)
+	RequestTimeoutResponse(w http.ResponseWriter, r *http.Request)
 }
 
 var (
@@ -52,11 +61,14 @@ var (
 	ErrUnsupportedTypeScanModel = errors.New("unsupported slice type for db scan")
 )
 
-func (e *errorHandler) HandlerError(w http.ResponseWriter, r *http.Request, err error, v *validator.Validator) {
-
+func (e *errorHandler) HandlerError(w http.ResponseWriter, r *http.Request, err error) {
+	var valErr *ValidationError
 	switch {
-	case errors.Is(err, ErrInvalidData):
-		e.FailedValidationResponse(w, r, v.Errors)
+	case errors.As(err, &valErr):
+		e.FailedValidationResponse(w, r, valErr.FieldErrors)
+
+	case errors.Is(err, context.DeadlineExceeded):
+		e.RequestTimeoutResponse(w, r)
 
 	case errors.Is(err, ErrRecordNotFound):
 		e.NotFoundResponse(w, r)
@@ -90,8 +102,24 @@ func ValidationAlreadyExists(field string) error {
 	return fmt.Errorf("%s->a register with this %s already exists", field, field)
 }
 
+func NewValidationError(fieldErrors map[string]string) *ValidationError {
+	return &ValidationError{
+		FieldErrors: fieldErrors,
+	}
+}
+
 func (e *errorHandler) NotPermittedResponse(w http.ResponseWriter, r *http.Request) {
 	message := "your user account doesn't have the necessary permissions to access this resource"
+	e.logger.PrintInfo("request timeout", map[string]string{
+		"method": r.Method,
+		"path":   r.URL.Path,
+		"ip":     r.RemoteAddr,
+	})
+	e.errorHandler(w, r, http.StatusRequestTimeout, message)
+}
+
+func (e *errorHandler) RequestTimeoutResponse(w http.ResponseWriter, r *http.Request) {
+	message := "request timeout, please try again"
 	e.errorHandler(w, r, http.StatusForbidden, message)
 }
 

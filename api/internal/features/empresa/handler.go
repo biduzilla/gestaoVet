@@ -1,10 +1,8 @@
 package empresa
 
 import (
-	"gestaoVet/internal/core/contexts"
 	"gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/handler"
-	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
 	"net/http"
 )
@@ -33,27 +31,28 @@ type EmpresaHandler interface {
 }
 
 func (h *empresaHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
-	v := validator.New()
 	cnpj := handler.ReadStringParam(r, "cnpj", "")
 	nomeFantasia := handler.ReadStringParam(r, "nomeFantasia", "")
 	razaoSocial := handler.ReadStringParam(r, "razaoSocial", "")
 	email := handler.ReadStringParam(r, "email", "")
 
-	f, err := handler.GetFilters(r, v, []string{"cnpj", "nome_fantasia", "-nome_fantasia", "-nome_fantasia"})
+	f, err := handler.GetFilters(r, []string{"cnpj", "nome_fantasia", "-nome_fantasia", "-nome_fantasia"})
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
 	models, metadata, err := h.service.FindAll(
+		r.Context(),
 		cnpj,
 		nomeFantasia,
 		razaoSocial,
 		email,
 		f,
 	)
+
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -81,9 +80,9 @@ func (h *empresaHandler) FindByCnpj(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	model, err := h.service.FindByCnpj(cnpj)
+	model, err := h.service.FindByCnpj(r.Context(), cnpj)
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, nil)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -103,11 +102,10 @@ func (h *empresaHandler) Save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := validator.New()
 	model := dto.toModel()
 
-	if err := h.service.Save(model, v); err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+	if err := h.service.Save(r.Context(), model); err != nil {
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -121,12 +119,10 @@ func (h *empresaHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := validator.New()
-	user := contexts.ContextGetUser(r)
 	model := dto.toModel()
 
-	if err := h.service.Update(model, v, user.GetID(), user.GetCNPJ()); err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+	if err := h.service.Update(r.Context(), model); err != nil {
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -134,14 +130,8 @@ func (h *empresaHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *empresaHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	cnpj, ok := handler.ParseStringField(w, r, h.errHandler, "cnpj")
-	if !ok {
-		return
-	}
-
-	user := contexts.ContextGetUser(r)
-	if err := h.service.Delete(cnpj, user.GetID()); err != nil {
-		h.errHandler.HandlerError(w, r, err, nil)
+	if err := h.service.Delete(r.Context()); err != nil {
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 

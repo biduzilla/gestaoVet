@@ -1,11 +1,9 @@
 package tutor
 
 import (
-	"gestaoVet/internal/core/contexts"
 	"gestaoVet/internal/core/domain/errors"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/handler"
-	"gestaoVet/internal/core/validator"
 	"gestaoVet/utils"
 	"net/http"
 )
@@ -34,25 +32,18 @@ func NewHandler(
 }
 
 func (h *tutorHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
-	v := validator.New()
 	search := handler.ReadStringParam(r, "search", "")
 
-	f, err := handler.GetFilters(r, v, []string{"cnpj", "nome", "-cnpj", "-nome"})
+	f, err := handler.GetFilters(r, []string{"cnpj", "nome", "-cnpj", "-nome"})
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
-	user := contexts.ContextGetUser(r)
-
-	models, metadata, err := h.service.FindAllBySearch(
-		search,
-		user.GetCNPJ(),
-		f,
-	)
+	models, metadata, err := h.service.FindAllBySearch(r.Context(), search, f)
 
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -80,10 +71,9 @@ func (h *tutorHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := contexts.ContextGetUser(r)
-	model, err := h.service.FindByID(id, user.GetCNPJ())
+	model, err := h.service.FindByID(r.Context(), id)
 	if err != nil {
-		h.errHandler.HandlerError(w, r, err, nil)
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -103,16 +93,10 @@ func (h *tutorHandler) Save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := validator.New()
-	user := contexts.ContextGetUser(r)
-	model, err := dto.toModel(v)
-	if err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
-		return
-	}
+	model := dto.ToModel()
 
-	if err := h.service.Save(nil, model, v, user.GetCNPJ()); err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+	if err := h.service.Save(r.Context(), model, nil); err != nil {
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -126,16 +110,10 @@ func (h *tutorHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := validator.New()
-	user := contexts.ContextGetUser(r)
-	model, err := dto.toModel(v)
-	if err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
-		return
-	}
+	model := dto.ToModel()
 
-	if err := h.service.Update(nil, model, v, user.GetCNPJ(), user.GetID()); err != nil {
-		h.errHandler.HandlerError(w, r, err, v)
+	if err := h.service.Update(r.Context(), model, nil); err != nil {
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 
@@ -148,9 +126,8 @@ func (h *tutorHandler) DeleteByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := contexts.ContextGetUser(r)
-	if err := h.service.DeleteByID(nil, id, user.GetID(), user.GetCNPJ()); err != nil {
-		h.errHandler.HandlerError(w, r, err, nil)
+	if err := h.service.DeleteByID(r.Context(), id, nil); err != nil {
+		h.errHandler.HandlerError(w, r, err)
 		return
 	}
 

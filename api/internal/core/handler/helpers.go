@@ -32,7 +32,9 @@ func ParseIntID(
 	return id, true
 }
 
-func GetFilters(r *http.Request, v *validator.Validator, sortSafelist []string) (filters.Filters, error) {
+func GetFilters(r *http.Request, sortSafelist []string) (filters.Filters, error) {
+	v := validator.New()
+
 	var f = filters.Filters{}
 	f.Page = ReadIntParam(r, "page", 1, v)
 	f.PageSize = ReadIntParam(r, "page_size", 20, v)
@@ -40,7 +42,7 @@ func GetFilters(r *http.Request, v *validator.Validator, sortSafelist []string) 
 	f.SortSafelist = sortSafelist
 
 	if filters.ValidateFilters(v, f); !v.Valid() {
-		return filters.Filters{}, e.ErrInvalidData
+		return filters.Filters{}, e.NewValidationError(v.Errors)
 	}
 
 	return f, nil

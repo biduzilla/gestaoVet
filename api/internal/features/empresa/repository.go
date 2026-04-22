@@ -4,14 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"gestaoVet/internal/core/contexts"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/internal/core/repository"
 	"gestaoVet/utils"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
 
@@ -34,27 +33,32 @@ func NewRepository(
 
 type EmpresaRepository interface {
 	FindByCnpj(
+		ctx context.Context,
 		cnpj string,
 	) (*Empresa, error)
 
 	FindAll(
+		ctx context.Context,
 		cnpj, nomeFantasia, razaoSocial, email string,
 		f filters.Filters,
 	) ([]*Empresa, filters.Metadata, error)
 
 	Insert(
+		ctx context.Context,
 		tx *sql.Tx,
 		model *Empresa,
 	) error
 
 	Update(
+		ctx context.Context,
 		tx *sql.Tx,
 		model *Empresa,
-		userID uuid.UUID,
-		cnpj string,
 	) error
 
-	Delete(tx *sql.Tx, cnpj string, userID uuid.UUID) error
+	Delete(
+		ctx context.Context,
+		tx *sql.Tx,
+	) error
 }
 
 func parseEmpresaConstraintError(err error) error {
@@ -76,16 +80,18 @@ func parseEmpresaConstraintError(err error) error {
 }
 
 func (r *empresaRepository) FindByCnpj(
+	ctx context.Context,
 	cnpj string,
 ) (*Empresa, error) {
 	query := `e.cnpj = :cnpj`
 	params := map[string]any{
 		"cnpj": cnpj,
 	}
-	return r.baseRepository.FindOne(query, params)
+	return r.baseRepository.FindOne(ctx, query, params)
 }
 
 func (r *empresaRepository) FindAll(
+	ctx context.Context,
 	cnpj, nomeFantasia, razaoSocial, email string,
 	f filters.Filters,
 ) ([]*Empresa, filters.Metadata, error) {
@@ -102,10 +108,11 @@ func (r *empresaRepository) FindAll(
 		"email":        email,
 	}
 
-	return r.baseRepository.FindWithFilters(f, query, params)
+	return r.baseRepository.FindWithFilters(ctx, f, query, params)
 }
 
 func (r *empresaRepository) Insert(
+	ctx context.Context,
 	tx *sql.Tx,
 	model *Empresa,
 ) error {
@@ -140,9 +147,6 @@ func (r *empresaRepository) Insert(
 	query, args := repository.NamedQuery(query, params)
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
 	err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&model.CreatedAt,
 		&model.Version,
@@ -159,11 +163,12 @@ func (r *empresaRepository) Insert(
 }
 
 func (r *empresaRepository) Update(
+	ctx context.Context,
 	tx *sql.Tx,
 	model *Empresa,
-	userID uuid.UUID,
-	cnpj string,
 ) error {
+	user := contexts.ContextGetUser(ctx)
+
 	query := `
 	update empresas
 	set 
@@ -185,18 +190,15 @@ func (r *empresaRepository) Update(
 	params := map[string]any{
 		"nomeFantasia": model.NomeFantasia,
 		"razaoSocial":  model.RazaoSocial,
-		"cnpj":         model.Cnpj,
+		"cnpj":         user.GetCNPJ(),
 		"email":        model.Email,
-		"userId":       userID,
+		"userId":       user.GetID(),
 		"version":      model.Version,
 		"telefone":     model.Telefone,
 	}
 
 	query, args := repository.NamedQuery(query, params)
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
 
 	err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&model.Version,
@@ -212,12 +214,17 @@ func (r *empresaRepository) Update(
 	return nil
 }
 
-func (r *empresaRepository) Delete(tx *sql.Tx, cnpj string, userID uuid.UUID) error {
+func (r *empresaRepository) Delete(
+	ctx context.Context,
+	tx *sql.Tx,
+) error {
+	user := contexts.ContextGetUser(ctx)
+
 	query := `cnpj = :cnpj`
 	params := map[string]any{
-		"cnpj":   cnpj,
-		"userID": userID,
+		"cnpj":   user.GetCNPJ(),
+		"userID": user.GetID(),
 	}
 
-	return r.baseRepository.DeleteByQuery(tx, query, params)
+	return r.baseRepository.DeleteByQuery(ctx, tx, query, params)
 }

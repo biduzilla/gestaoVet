@@ -1,6 +1,7 @@
 package tutor
 
 import (
+	"context"
 	"database/sql"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
@@ -17,33 +18,32 @@ type tutorService struct {
 
 type TutorService interface {
 	FindByID(
+		ctx context.Context,
 		ID uuid.UUID,
-		cnpj string,
 	) (*Tutor, error)
 
 	FindAllBySearch(
+		ctx context.Context,
 		search string,
-		cnpj string,
 		f filters.Filters,
 	) ([]*Tutor, filters.Metadata, error)
 
 	Save(
-		tx *sql.Tx, model *Tutor,
-		v *validator.Validator,
-		cpnj string,
+		ctx context.Context,
+		model *Tutor,
+		tx *sql.Tx,
 	) error
 
 	Update(
-		tx *sql.Tx, model *Tutor,
-		v *validator.Validator,
-		cpnj string,
-		ID uuid.UUID,
+		ctx context.Context,
+		model *Tutor,
+		tx *sql.Tx,
 	) error
 
 	DeleteByID(
+		ctx context.Context,
+		ID uuid.UUID,
 		tx *sql.Tx,
-		ID, userID uuid.UUID,
-		cnpj string,
 	) error
 }
 
@@ -58,31 +58,32 @@ func NewService(
 }
 
 func (s *tutorService) FindByID(
+	ctx context.Context,
 	ID uuid.UUID,
-	cnpj string,
 ) (*Tutor, error) {
-	return s.repo.FindByID(ID, cnpj)
+	return s.repo.FindByID(ctx, ID)
 }
 
 func (s *tutorService) FindAllBySearch(
+	ctx context.Context,
 	search string,
-	cnpj string,
 	f filters.Filters,
 ) ([]*Tutor, filters.Metadata, error) {
-	return s.repo.FindAll(search, cnpj, f)
+	return s.repo.FindAll(ctx, search, f)
 }
 
 func (s *tutorService) Save(
-	tx *sql.Tx, model *Tutor,
-	v *validator.Validator,
-	cpnj string,
+	ctx context.Context,
+	model *Tutor,
+	tx *sql.Tx,
 ) error {
 	saveLogic := func(tx *sql.Tx) error {
-		model.Cnpj = cpnj
+		v := validator.New()
 		if model.Validate(v); !v.Valid() {
-			return e.ErrInvalidData
+			return e.NewValidationError(v.Errors)
 		}
-		return s.repo.Insert(tx, model)
+
+		return s.repo.Insert(ctx, tx, model)
 	}
 
 	if tx != nil {
@@ -93,17 +94,17 @@ func (s *tutorService) Save(
 }
 
 func (s *tutorService) Update(
-	tx *sql.Tx,
+	ctx context.Context,
 	model *Tutor,
-	v *validator.Validator,
-	cpnj string,
-	ID uuid.UUID,
+	tx *sql.Tx,
 ) error {
 	updateLogic := func(tx *sql.Tx) error {
+		v := validator.New()
+
 		if model.Validate(v); !v.Valid() {
-			return e.ErrInvalidData
+			return e.NewValidationError(v.Errors)
 		}
-		return s.repo.Update(tx, model, cpnj, ID)
+		return s.repo.Update(ctx, tx, model)
 	}
 
 	if tx != nil {
@@ -114,12 +115,12 @@ func (s *tutorService) Update(
 }
 
 func (s *tutorService) DeleteByID(
+	ctx context.Context,
+	ID uuid.UUID,
 	tx *sql.Tx,
-	ID, userID uuid.UUID,
-	cnpj string,
 ) error {
 	deleteLogic := func(tx *sql.Tx) error {
-		return s.DeleteByID(tx, ID, userID, cnpj)
+		return s.repo.DeleteByID(ctx, ID, tx)
 	}
 
 	if tx != nil {

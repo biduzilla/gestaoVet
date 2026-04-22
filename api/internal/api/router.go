@@ -3,7 +3,6 @@ package api
 import (
 	"database/sql"
 	"expvar"
-	"gestaoVet/internal/core/adapter"
 	"gestaoVet/internal/core/config"
 	"gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/jsonlog"
@@ -40,9 +39,6 @@ func NewRouter(
 	m := middleware.New(
 		e,
 		config,
-		adapter.UserFinderAdapter{
-			Service: h.Services.UsuarioService,
-		},
 		h.Services.AuthService,
 		logger,
 	)
@@ -58,6 +54,7 @@ func NewRouter(
 func (router *Router) RegisterRoutes() *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(router.m.RecoverPanic)
+	r.Use(router.m.TimeoutMiddleWare)
 	r.Use(router.m.Metrics)
 	r.Use(router.m.RateLimit)
 	r.Use(router.m.EnableCORS)

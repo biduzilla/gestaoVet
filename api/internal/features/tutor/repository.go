@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"gestaoVet/internal/core/contexts"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/internal/core/repository"
 	"gestaoVet/utils"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -20,34 +20,34 @@ type tutorRepository struct {
 	logger         jsonlog.Logger
 	baseRepository repository.BaseRepository[Tutor]
 }
-
 type TutorRepository interface {
 	FindByID(
+		ctx context.Context,
 		ID uuid.UUID,
-		cnpj string) (*Tutor, error)
+	) (*Tutor, error)
 
 	FindAll(
+		ctx context.Context,
 		search string,
-		cnpj string,
 		f filters.Filters,
 	) ([]*Tutor, filters.Metadata, error)
 
 	Insert(
+		ctx context.Context,
 		tx *sql.Tx,
 		model *Tutor,
 	) error
 
 	Update(
+		ctx context.Context,
 		tx *sql.Tx,
 		model *Tutor,
-		cnpj string,
-		ID uuid.UUID,
 	) error
 
 	DeleteByID(
+		ctx context.Context,
+		ID uuid.UUID,
 		tx *sql.Tx,
-		id, userID uuid.UUID,
-		cnpj string,
 	) error
 }
 
@@ -77,27 +77,30 @@ func parseTutorConstraintError(err error) error {
 }
 
 func (r *tutorRepository) FindByID(
+	ctx context.Context,
 	ID uuid.UUID,
-	cnpj string) (*Tutor, error) {
+) (*Tutor, error) {
+	user := contexts.ContextGetUser(ctx)
 	params := map[string]any{
 		"id":   ID,
-		"cnpj": cnpj,
+		"cnpj": user.GetCNPJ(),
 	}
 
-	return r.baseRepository.FindOne(`
+	return r.baseRepository.FindOne(ctx, `
 		t.id = :id 
 		and t.cnpj = :cnpj
 	`, params)
 }
 
 func (r *tutorRepository) FindAll(
+	ctx context.Context,
 	search string,
-	cnpj string,
 	f filters.Filters,
 ) ([]*Tutor, filters.Metadata, error) {
+	user := contexts.ContextGetUser(ctx)
 	params := map[string]any{
 		"search": search,
-		"cnpj":   cnpj,
+		"cnpj":   user.GetCNPJ(),
 	}
 
 	query := `
@@ -114,13 +117,16 @@ func (r *tutorRepository) FindAll(
 			and t.cnpj = :cnpj
 	`
 
-	return r.baseRepository.FindWithFilters(f, query, params)
+	return r.baseRepository.FindWithFilters(ctx, f, query, params)
 }
 
 func (r *tutorRepository) Insert(
+	ctx context.Context,
 	tx *sql.Tx,
 	model *Tutor,
 ) error {
+	user := contexts.ContextGetUser(ctx)
+
 	query := `
 	insert into tutores (
 		nome,
@@ -141,7 +147,8 @@ func (r *tutorRepository) Insert(
 		numero,
 		complemento,
 		estado,
-		cnpj
+		cnpj,
+		created_by
 	)
 	values (
 		:nome,
@@ -162,7 +169,8 @@ func (r *tutorRepository) Insert(
 		:numero,
 		:complemento,
 		:estado,
-		:cnpj
+		:cnpj,
+		:createdBy
 	)
 	returning
 		id,
@@ -190,12 +198,10 @@ func (r *tutorRepository) Insert(
 		"complemento": model.Complemento,
 		"estado":      model.Estado,
 		"cnpj":        model.Cnpj,
+		"createdBy":   user.GetID(),
 	}
 
 	query, args := repository.NamedQuery(query, params)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
 
 	err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&model.ID,
@@ -215,11 +221,12 @@ func (r *tutorRepository) Insert(
 }
 
 func (r *tutorRepository) Update(
+	ctx context.Context,
 	tx *sql.Tx,
 	model *Tutor,
-	cnpj string,
-	ID uuid.UUID,
 ) error {
+	user := contexts.ContextGetUser(ctx)
+
 	query := `
 	update tutores
 	set
@@ -272,8 +279,8 @@ func (r *tutorRepository) Update(
 		"numero":      model.Numero,
 		"complemento": model.Complemento,
 		"estado":      model.Estado,
-		"cnpj":        cnpj,
-		"ID":          ID,
+		"cnpj":        user.GetCNPJ(),
+		"ID":          user.GetID(),
 		"version":     model.Version,
 		"tutorId":     model.ID,
 	}
@@ -281,9 +288,6 @@ func (r *tutorRepository) Update(
 	query, args := repository.NamedQuery(query, params)
 
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
 
 	err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&model.Version,
@@ -301,19 +305,20 @@ func (r *tutorRepository) Update(
 }
 
 func (r *tutorRepository) DeleteByID(
+	ctx context.Context,
+	ID uuid.UUID,
 	tx *sql.Tx,
-	id, userID uuid.UUID,
-	cnpj string,
 ) error {
+	user := contexts.ContextGetUser(ctx)
 	params := map[string]any{
-		"id":     id,
-		"userID": userID,
-		"cnpj":   cnpj,
+		"id":     ID,
+		"userID": user.GetID(),
+		"cnpj":   user.GetCNPJ(),
 	}
 
 	query := `
 		id = :id
 		and cnpj = :cnpj
 	`
-	return r.baseRepository.DeleteByQuery(tx, query, params)
+	return r.baseRepository.DeleteByQuery(ctx, tx, query, params)
 }
