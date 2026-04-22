@@ -15,10 +15,13 @@ import (
 func (app *application) Server() error {
 	defer app.db.Close()
 
+	shutdown := make(chan struct{})
+
 	r, err := NewRouter(
 		app.db,
 		app.Logger,
 		app.config,
+		shutdown,
 	)
 
 	if err != nil {
@@ -53,7 +56,8 @@ func (app *application) Server() error {
 			shutdownError <- err
 		}
 
-		defer app.db.Close()
+		// defer app.db.Close()
+		close(shutdown)
 
 		app.Logger.PrintInfo("completing background tasks", map[string]string{
 			"addr": srv.Addr,

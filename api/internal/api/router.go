@@ -29,6 +29,7 @@ func NewRouter(
 	db *sql.DB,
 	logger jsonlog.Logger,
 	config config.Config,
+	shutdown <-chan struct{},
 ) (*Router, error) {
 	e := errors.NewErrorHandler(logger)
 	h, err := NewHandler(db, logger, e, config)
@@ -41,6 +42,7 @@ func NewRouter(
 		config,
 		h.Services.AuthService,
 		logger,
+		shutdown,
 	)
 	return &Router{
 		m:          m,

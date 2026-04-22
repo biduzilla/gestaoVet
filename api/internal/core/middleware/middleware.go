@@ -36,6 +36,7 @@ type middleware struct {
 	jwtService JWTService
 	config     config.Config
 	logger     jsonlog.Logger
+	shutdown   <-chan struct{}
 }
 
 type Middleware interface {
@@ -56,12 +57,14 @@ func New(
 	config config.Config,
 	jwtService JWTService,
 	logger jsonlog.Logger,
+	shutdown <-chan struct{},
 ) *middleware {
 	return &middleware{
 		jwtService: jwtService,
 		errHandler: errHandler,
 		config:     config,
 		logger:     logger,
+		shutdown:   shutdown,
 	}
 }
 
@@ -252,15 +255,25 @@ func (m *middleware) RateLimit(next http.Handler) http.Handler {
 	)
 
 	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+
 		for {
-			time.Sleep(time.Minute)
-			mu.Lock()
-			for ip, client := range clients {
-				if time.Since(client.lastSeen) > 3*time.Minute {
-					delete(clients, ip)
+			select {
+			case <-ticker.C:
+				mu.Lock()
+				for ip, c := range clients {
+					if time.Since(c.lastSeen) > 3*time.Minute {
+						delete(clients, ip)
+					}
 				}
+				mu.Unlock()
+			case <-m.shutdown:
+				mu.Lock()
+				clients = make(map[string]*client) // Limpa tudo
+				mu.Unlock()
+				return
 			}
-			mu.Unlock()
 		}
 	}()
 
