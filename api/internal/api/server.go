@@ -26,7 +26,7 @@ func (app *application) Server() error {
 	}
 
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", app.config.Port),
+		Addr:         fmt.Sprintf(":%d", app.config.Server.Port),
 		Handler:      r.RegisterRoutes(),
 		IdleTimeout:  time.Minute,
 		ErrorLog:     log.New(app.Logger, "", 0),

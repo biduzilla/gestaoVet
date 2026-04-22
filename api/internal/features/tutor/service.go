@@ -5,15 +5,15 @@ import (
 	"database/sql"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
+	"gestaoVet/internal/core/transaction"
 	"gestaoVet/internal/core/validator"
-	"gestaoVet/utils"
 
 	"github.com/google/uuid"
 )
 
 type tutorService struct {
 	repo TutorRepository
-	db   *sql.DB
+	tx   transaction.Manager
 }
 
 type TutorService interface {
@@ -49,11 +49,11 @@ type TutorService interface {
 
 func NewService(
 	repo TutorRepository,
-	db *sql.DB,
+	tx transaction.Manager,
 ) TutorService {
 	return &tutorService{
 		repo: repo,
-		db:   db,
+		tx:   tx,
 	}
 }
 
@@ -90,7 +90,7 @@ func (s *tutorService) Save(
 		return saveLogic(tx)
 	}
 
-	return utils.RunInTx(s.db, saveLogic)
+	return s.tx.RunInTx(ctx, saveLogic)
 }
 
 func (s *tutorService) Update(
@@ -111,7 +111,7 @@ func (s *tutorService) Update(
 		return updateLogic(tx)
 	}
 
-	return utils.RunInTx(s.db, updateLogic)
+	return s.tx.RunInTx(ctx, updateLogic)
 }
 
 func (s *tutorService) DeleteByID(
@@ -127,5 +127,5 @@ func (s *tutorService) DeleteByID(
 		return deleteLogic(tx)
 	}
 
-	return utils.RunInTx(s.db, deleteLogic)
+	return s.tx.RunInTx(ctx, deleteLogic)
 }

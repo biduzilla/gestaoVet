@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"gestaoVet/internal/core/config"
 	"gestaoVet/internal/core/jsonlog"
+	"gestaoVet/internal/core/transaction"
 	"gestaoVet/internal/features/auth"
 	"gestaoVet/internal/features/empresa"
 	"gestaoVet/internal/features/tutor"
@@ -19,16 +20,18 @@ type Services struct {
 
 func NewServices(db *sql.DB, logger jsonlog.Logger, config config.Config) (*Services, error) {
 	r := NewRepository(db, logger)
-	usuarioService := usuario.NewService(r.UsuarioRepository, db)
+	tx := transaction.NewManager(db)
+
+	usuarioService := usuario.NewService(r.UsuarioRepository, tx)
 	authService, err := auth.NewService(usuarioService, config)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Services{
-		EmpresaService: empresa.NewService(usuarioService, r.EmpresaRepository, db),
+		EmpresaService: empresa.NewService(usuarioService, r.EmpresaRepository, tx),
 		UsuarioService: usuarioService,
 		AuthService:    authService,
-		TutorService:   tutor.NewService(r.TutorRepository, db),
+		TutorService:   tutor.NewService(r.TutorRepository, tx),
 	}, nil
 }

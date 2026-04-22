@@ -22,6 +22,10 @@ func (e *ValidationError) Error() string {
 	return "validation failed"
 }
 
+func (e *ValidationError) Unwrap() error {
+	return nil
+}
+
 func NewErrorHandler(logger jsonlog.Logger) *errorHandler {
 	return &errorHandler{
 		logger: logger,

@@ -6,15 +6,15 @@ import (
 	"gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/interfaces"
+	"gestaoVet/internal/core/transaction"
 	"gestaoVet/internal/core/validator"
-	"gestaoVet/utils"
 
 	"github.com/google/uuid"
 )
 
 type usuarioService struct {
 	repository UsuarioRepository
-	db         *sql.DB
+	tx         transaction.Manager
 }
 
 type UsuarioService interface {
@@ -65,11 +65,11 @@ type UsuarioService interface {
 
 func NewService(
 	repository UsuarioRepository,
-	db *sql.DB,
+	tx transaction.Manager,
 ) *usuarioService {
 	return &usuarioService{
 		repository: repository,
-		db:         db,
+		tx:         tx,
 	}
 }
 
@@ -118,7 +118,7 @@ func (s *usuarioService) Save(
 		return saveLogic(tx)
 	}
 
-	return utils.RunInTx(s.db, saveLogic)
+	return s.tx.RunInTx(ctx, saveLogic)
 }
 
 func (s *usuarioService) UpdateRoles(
@@ -126,7 +126,7 @@ func (s *usuarioService) UpdateRoles(
 	userID uuid.UUID,
 	roles []int32,
 ) error {
-	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+	return s.tx.RunInTx(ctx, func(tx *sql.Tx) error {
 		user, err := s.FindByID(ctx, userID)
 		if err != nil {
 			return err
@@ -142,7 +142,7 @@ func (s *usuarioService) Update(
 	ctx context.Context,
 	model *Usuario,
 ) error {
-	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+	return s.tx.RunInTx(ctx, func(tx *sql.Tx) error {
 		v := validator.New()
 		if model.Validate(v); !v.Valid() {
 			return errors.NewValidationError(v.Errors)
@@ -157,7 +157,7 @@ func (s *usuarioService) UpdateSenha(
 	userID uuid.UUID,
 	senha string,
 ) error {
-	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+	return s.tx.RunInTx(ctx, func(tx *sql.Tx) error {
 		user, err := s.FindByID(ctx, userID)
 		if err != nil {
 			return err
@@ -171,7 +171,7 @@ func (s *usuarioService) Delete(
 	ctx context.Context,
 	id uuid.UUID,
 ) error {
-	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+	return s.tx.RunInTx(ctx, func(tx *sql.Tx) error {
 		return s.repository.Delete(ctx, tx, id)
 	})
 }

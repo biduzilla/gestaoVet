@@ -9,7 +9,8 @@ func main() {
 	c := config.New()
 	var cfg config.Config
 
-	cfg.Port = c.Server.Port
+	cfg.Server.Port = c.Server.Port
+	cfg.Server.Timeout = c.Server.Timeout
 	cfg.Env = "development"
 	cfg.DB.DSN = c.DB.DSN
 	cfg.DB.MaxOpenConns = c.DB.MaxOpenConns

@@ -7,9 +7,12 @@ import (
 )
 
 type Config struct {
-	Port int
-	Env  string
-	DB   struct {
+	Server struct {
+		Port    int
+		Timeout int
+	}
+	Env string
+	DB  struct {
 		DSN          string
 		MaxOpenConns int
 		MaxIdleConns int
@@ -37,8 +40,9 @@ type Conf struct {
 }
 
 type ConfServer struct {
-	Port  int  `env:"SERVER_PORT,required"`
-	Debug bool `env:"SERVER_DEBUG,required"`
+	Port    int  `env:"SERVER_PORT,required"`
+	Debug   bool `env:"SERVER_DEBUG,required"`
+	Timeout int  `env:"SERVER_TIMEOUT,required"`
 }
 
 type ConfDB struct {

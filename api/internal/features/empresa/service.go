@@ -7,26 +7,26 @@ import (
 	"gestaoVet/internal/core/domain/models"
 	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/interfaces"
+	"gestaoVet/internal/core/transaction"
 	"gestaoVet/internal/core/validator"
 	"gestaoVet/internal/features/usuario"
-	"gestaoVet/utils"
 )
 
 type empresaService struct {
 	repository     EmpresaRepository
 	usuarioService usuario.UsuarioService
-	db             *sql.DB
+	tx             transaction.Manager
 }
 
 func NewService(
 	usuarioService usuario.UsuarioService,
 	repository EmpresaRepository,
-	db *sql.DB,
+	tx transaction.Manager,
 ) *empresaService {
 	return &empresaService{
 		usuarioService: usuarioService,
 		repository:     repository,
-		db:             db,
+		tx:             tx,
 	}
 }
 
@@ -58,7 +58,7 @@ func (s *empresaService) Save(
 	ctx context.Context,
 	model *Empresa,
 ) error {
-	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+	return s.tx.RunInTx(ctx, func(tx *sql.Tx) error {
 		v := validator.New()
 		if model.Validate(v); !v.Valid() {
 			return errors.NewValidationError(v.Errors)
@@ -77,7 +77,7 @@ func (s *empresaService) Update(
 	ctx context.Context,
 	model *Empresa,
 ) error {
-	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+	return s.tx.RunInTx(ctx, func(tx *sql.Tx) error {
 		v := validator.New()
 		if model.Validate(v); !v.Valid() {
 			return errors.NewValidationError(v.Errors)
@@ -92,7 +92,7 @@ func (s *empresaService) FindByCnpj(ctx context.Context, cnpj string) (*Empresa,
 }
 
 func (s *empresaService) Delete(ctx context.Context) error {
-	return utils.RunInTx(s.db, func(tx *sql.Tx) error {
+	return s.tx.RunInTx(ctx, func(tx *sql.Tx) error {
 		return s.repository.Delete(ctx, tx)
 	})
 }

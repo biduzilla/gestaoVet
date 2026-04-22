@@ -1,9 +1,7 @@
 package utils
 
 import (
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"gestaoVet/internal/core/interfaces"
 	"maps"
 	"net/http"
@@ -101,27 +99,6 @@ func ConvertInt32ToRoles(rolesInt32 []int32) []interfaces.Role {
 		roles[i] = interfaces.Role(r)
 	}
 	return roles
-}
-
-func RunInTx(
-	db *sql.DB,
-	fn func(tx *sql.Tx) error,
-) error {
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-
-	fnErr := fn(tx)
-	if fnErr == nil {
-		return tx.Commit()
-	}
-
-	if rbErr := tx.Rollback(); rbErr != nil {
-		return errors.Join(fnErr, rbErr)
-	}
-
-	return fnErr
 }
 
 func ValidateTelefone(telefone string) bool {
