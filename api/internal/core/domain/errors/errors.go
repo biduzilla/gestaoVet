@@ -7,7 +7,6 @@ import (
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/utils"
 	"net/http"
-	"strings"
 )
 
 type errorHandler struct {
@@ -20,10 +19,6 @@ type ValidationError struct {
 
 func (e *ValidationError) Error() string {
 	return "validation failed"
-}
-
-func (e *ValidationError) Unwrap() error {
-	return nil
 }
 
 func NewErrorHandler(logger jsonlog.Logger) *errorHandler {
@@ -89,21 +84,17 @@ func (e *errorHandler) HandlerError(w http.ResponseWriter, r *http.Request, err 
 	case errors.Is(err, ErrInvalidCredentials):
 		e.InvalidCredentialsResponse(w, r)
 
-	case len(strings.Split(err.Error(), "->")) > 1:
-		parts := strings.Split(err.Error(), "->")
-		for i := 0; i+1 < len(parts); i += 2 {
-			e.FailedValidationResponse(w, r, map[string]string{
-				parts[i]: parts[i+1],
-			})
-		}
-
 	default:
 		e.ServerErrorResponse(w, r, err)
 	}
 }
 
 func ValidationAlreadyExists(field string) error {
-	return fmt.Errorf("%s->a register with this %s already exists", field, field)
+	return &ValidationError{
+		FieldErrors: map[string]string{
+			field: fmt.Sprintf("a record with this %s already exists", field),
+		},
+	}
 }
 
 func NewValidationError(fieldErrors map[string]string) *ValidationError {
@@ -119,12 +110,17 @@ func (e *errorHandler) NotPermittedResponse(w http.ResponseWriter, r *http.Reque
 		"path":   r.URL.Path,
 		"ip":     r.RemoteAddr,
 	})
-	e.errorHandler(w, r, http.StatusRequestTimeout, message)
+	e.errorHandler(w, r, http.StatusForbidden, message)
 }
 
 func (e *errorHandler) RequestTimeoutResponse(w http.ResponseWriter, r *http.Request) {
 	message := "request timeout, please try again"
-	e.errorHandler(w, r, http.StatusForbidden, message)
+	e.logger.PrintInfo("request timeout", map[string]string{
+		"method": r.Method,
+		"path":   r.URL.Path,
+		"ip":     r.RemoteAddr,
+	})
+	e.errorHandler(w, r, http.StatusGatewayTimeout, message)
 }
 
 func (e *errorHandler) MalFormedTokenResponse(w http.ResponseWriter, r *http.Request) {
@@ -187,8 +183,8 @@ func (e *errorHandler) BadRequestResponse(w http.ResponseWriter, r *http.Request
 	e.errorHandler(w, r, http.StatusBadRequest, err.Error())
 }
 
-func (e *errorHandler) FailedValidationResponse(w http.ResponseWriter, r *http.Request, errors map[string]string) {
-	e.errorHandler(w, r, http.StatusUnprocessableEntity, errors)
+func (e *errorHandler) FailedValidationResponse(w http.ResponseWriter, r *http.Request, fieldErrors map[string]string) {
+	e.errorHandler(w, r, http.StatusUnprocessableEntity, fieldErrors)
 }
 
 func (e *errorHandler) EditConflictResponse(w http.ResponseWriter, r *http.Request) {
@@ -201,7 +197,7 @@ func (e *errorHandler) errorHandler(w http.ResponseWriter, r *http.Request, stat
 	err := utils.WriteJSON(w, status, env, nil)
 	if err != nil {
 		e.logError(r, err)
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
