@@ -3,13 +3,11 @@ package tutor
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"gestaoVet/internal/core/contexts"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/internal/core/repository"
-	"gestaoVet/utils"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -127,97 +125,111 @@ func (r *tutorRepository) Insert(
 ) error {
 	user := contexts.ContextGetUser(ctx)
 
-	query := `
-	insert into tutores (
-		nome,
-		celular,
-		sexo,
-		nascimento,
-		identidade,
-		cpf,
-		observacoes,
-		cep,
-		endereco,
-		bairro,
-		cidade,
-		telefone1,
-		telefone2,
-		email1,
-		email2,
-		numero,
-		complemento,
-		estado,
-		cnpj,
-		created_by
-	)
-	values (
-		:nome,
-		:celular,
-		:sexo,
-		:nascimento,
-		:identidade,
-		:cpf,
-		:observacoes,
-		:cep,
-		:endereco,
-		:bairro,
-		:cidade,
-		:telefone1,
-		:telefone2,
-		:email1,
-		:email2,
-		:numero,
-		:complemento,
-		:estado,
-		:cnpj,
-		:createdBy
-	)
-	returning
-		id,
-		created_at,
-		version
-	`
-
-	params := map[string]any{
-		"nome":        model.Nome,
-		"celular":     model.Celular,
-		"sexo":        model.Sexo,
-		"nascimento":  model.Nascimento,
-		"identidade":  model.Identidade,
-		"cpf":         model.CPF,
-		"observacoes": model.Observacoes,
-		"cep":         model.CEP,
-		"endereco":    model.Endereco,
-		"bairro":      model.Bairro,
-		"cidade":      model.Cidade,
-		"telefone1":   model.Telefone1,
-		"telefone2":   model.Telefone2,
-		"email1":      model.Email1,
-		"email2":      model.Email2,
-		"numero":      model.Numero,
-		"complemento": model.Complemento,
-		"estado":      model.Estado,
-		"cnpj":        model.Cnpj,
-		"createdBy":   user.GetID(),
-	}
-
-	query, args := repository.NamedQuery(query, params)
-
-	err := tx.QueryRowContext(ctx, query, args...).Scan(
-		&model.ID,
-		&model.CreatedAt,
-		&model.Version,
+	err := r.baseRepository.Insert(
+		ctx,
+		tx,
+		model,
+		repository.WithExtraWhere("", map[string]any{
+			"cnpj":      user.GetCNPJ(),
+			"createdBy": user.GetID(),
+		}),
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return e.ErrRecordNotFound
-		}
-
 		return parseTutorConstraintError(err)
 	}
-
 	return nil
+	// query := `
+	// insert into tutores (
+	// 	nome,
+	// 	celular,
+	// 	sexo,
+	// 	nascimento,
+	// 	identidade,
+	// 	cpf,
+	// 	observacoes,
+	// 	cep,
+	// 	endereco,
+	// 	bairro,
+	// 	cidade,
+	// 	telefone1,
+	// 	telefone2,
+	// 	email1,
+	// 	email2,
+	// 	numero,
+	// 	complemento,
+	// 	estado,
+	// 	cnpj,
+	// 	created_by
+	// )
+	// values (
+	// 	:nome,
+	// 	:celular,
+	// 	:sexo,
+	// 	:nascimento,
+	// 	:identidade,
+	// 	:cpf,
+	// 	:observacoes,
+	// 	:cep,
+	// 	:endereco,
+	// 	:bairro,
+	// 	:cidade,
+	// 	:telefone1,
+	// 	:telefone2,
+	// 	:email1,
+	// 	:email2,
+	// 	:numero,
+	// 	:complemento,
+	// 	:estado,
+	// 	:cnpj,
+	// 	:createdBy
+	// )
+	// returning
+	// 	id,
+	// 	created_at,
+	// 	version
+	// `
+
+	// params := map[string]any{
+	// 	"nome":        model.Nome,
+	// 	"celular":     model.Celular,
+	// 	"sexo":        model.Sexo,
+	// 	"nascimento":  model.Nascimento,
+	// 	"identidade":  model.Identidade,
+	// 	"cpf":         model.CPF,
+	// 	"observacoes": model.Observacoes,
+	// 	"cep":         model.CEP,
+	// 	"endereco":    model.Endereco,
+	// 	"bairro":      model.Bairro,
+	// 	"cidade":      model.Cidade,
+	// 	"telefone1":   model.Telefone1,
+	// 	"telefone2":   model.Telefone2,
+	// 	"email1":      model.Email1,
+	// 	"email2":      model.Email2,
+	// 	"numero":      model.Numero,
+	// 	"complemento": model.Complemento,
+	// 	"estado":      model.Estado,
+	// 	"cnpj":        model.Cnpj,
+	// 	"createdBy":   user.GetID(),
+	// }
+
+	// query, args := repository.NamedQuery(query, params)
+
+	// err := tx.QueryRowContext(ctx, query, args...).Scan(
+	// 	&model.ID,
+	// 	&model.CreatedAt,
+	// 	&model.Version,
+	// )
+
+	// if err != nil {
+	// 	if errors.Is(err, sql.ErrNoRows) {
+	// 		return e.ErrRecordNotFound
+	// 	}
+
+	// 	return parseTutorConstraintError(err)
+	// }
+
+	// return nil
 }
 
 func (r *tutorRepository) Update(
@@ -227,81 +239,96 @@ func (r *tutorRepository) Update(
 ) error {
 	user := contexts.ContextGetUser(ctx)
 
-	query := `
-	update tutores
-	set
-		nome = :nome,
-		celular = :celular,
-		sexo = :sexo,
-		nascimento = :nascimento,
-		identidade = :identidade,
-		cpf = :cpf,
-		observacoes = :observacoes,
-		cep = :cep,
-		endereco = :endereco,
-		bairro = :bairro,
-		cidade = :cidade,
-		telefone1 = :telefone1,
-		telefone2 = :telefone2,
-		email1 = :email1,
-		email2 = :email2,
-		numero = :numero,
-		complemento = :complemento,
-		estado = :estado,
-		updated_at = now(),
-		updated_by = :ID,
-		version = tutores.version + 1
-	where
-		id = :tutorId
-		and cnpj = :cnpj
-		and version = :version
-		and deleted = false
-	returning
-		version
-	`
-
-	params := map[string]any{
-		"nome":        model.Nome,
-		"celular":     model.Celular,
-		"sexo":        model.Sexo,
-		"nascimento":  model.Nascimento,
-		"identidade":  model.Identidade,
-		"cpf":         model.CPF,
-		"observacoes": model.Observacoes,
-		"cep":         model.CEP,
-		"endereco":    model.Endereco,
-		"bairro":      model.Bairro,
-		"cidade":      model.Cidade,
-		"telefone1":   model.Telefone1,
-		"telefone2":   model.Telefone2,
-		"email1":      model.Email1,
-		"email2":      model.Email2,
-		"numero":      model.Numero,
-		"complemento": model.Complemento,
-		"estado":      model.Estado,
-		"cnpj":        user.GetCNPJ(),
-		"ID":          user.GetID(),
-		"version":     model.Version,
-		"tutorId":     model.ID,
-	}
-
-	query, args := repository.NamedQuery(query, params)
-
-	r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	err := tx.QueryRowContext(ctx, query, args...).Scan(
-		&model.Version,
+	err := r.baseRepository.Update(
+		ctx,
+		tx,
+		model,
+		model.ID,
+		repository.WithExtraWhere("and cnpj = :cnpj", map[string]any{
+			"cnpj":      user.GetCNPJ(),
+			"updatedBy": user.GetID(),
+		}),
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return e.ErrEditConflict
-		}
-
 		return parseTutorConstraintError(err)
 	}
-
 	return nil
+	// query := `
+	// update tutores
+	// set
+	// 	nome = :nome,
+	// 	celular = :celular,
+	// 	sexo = :sexo,
+	// 	nascimento = :nascimento,
+	// 	identidade = :identidade,
+	// 	cpf = :cpf,
+	// 	observacoes = :observacoes,
+	// 	cep = :cep,
+	// 	endereco = :endereco,
+	// 	bairro = :bairro,
+	// 	cidade = :cidade,
+	// 	telefone1 = :telefone1,
+	// 	telefone2 = :telefone2,
+	// 	email1 = :email1,
+	// 	email2 = :email2,
+	// 	numero = :numero,
+	// 	complemento = :complemento,
+	// 	estado = :estado,
+	// 	updated_at = now(),
+	// 	updated_by = :ID,
+	// 	version = tutores.version + 1
+	// where
+	// 	id = :tutorId
+	// 	and cnpj = :cnpj
+	// 	and version = :version
+	// 	and deleted = false
+	// returning
+	// 	version
+	// `
+
+	// params := map[string]any{
+	// 	"nome":        model.Nome,
+	// 	"celular":     model.Celular,
+	// 	"sexo":        model.Sexo,
+	// 	"nascimento":  model.Nascimento,
+	// 	"identidade":  model.Identidade,
+	// 	"cpf":         model.CPF,
+	// 	"observacoes": model.Observacoes,
+	// 	"cep":         model.CEP,
+	// 	"endereco":    model.Endereco,
+	// 	"bairro":      model.Bairro,
+	// 	"cidade":      model.Cidade,
+	// 	"telefone1":   model.Telefone1,
+	// 	"telefone2":   model.Telefone2,
+	// 	"email1":      model.Email1,
+	// 	"email2":      model.Email2,
+	// 	"numero":      model.Numero,
+	// 	"complemento": model.Complemento,
+	// 	"estado":      model.Estado,
+	// 	"cnpj":        user.GetCNPJ(),
+	// 	"ID":          user.GetID(),
+	// 	"version":     model.Version,
+	// 	"tutorId":     model.ID,
+	// }
+
+	// query, args := repository.NamedQuery(query, params)
+
+	// r.logger.PrintInfo(utils.MinifySQL(query), nil)
+
+	// err := tx.QueryRowContext(ctx, query, args...).Scan(
+	// 	&model.Version,
+	// )
+
+	// if err != nil {
+	// 	if errors.Is(err, sql.ErrNoRows) {
+	// 		return e.ErrEditConflict
+	// 	}
+
+	// 	return parseTutorConstraintError(err)
+	// }
+
+	// return nil
 }
 
 func (r *tutorRepository) DeleteByID(

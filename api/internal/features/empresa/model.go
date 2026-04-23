@@ -8,12 +8,12 @@ import (
 
 type Empresa struct {
 	models.BaseModel
-	Cnpj         string `db:"cnpj"`
-	NomeFantasia string `db:"nome_fantasia"`
-	RazaoSocial  string `db:"razao_social"`
-	Telefone     string `db:"telefone"`
-	IsAtivo      bool   `db:"is_ativo"`
-	Email        string `db:"email"`
+	Cnpj         string `db:"cnpj" repo:"insert,noupdate"`
+	NomeFantasia string `db:"nome_fantasia" repo:"insert,update"`
+	RazaoSocial  string `db:"razao_social" repo:"insert,update"`
+	Telefone     string `db:"telefone" repo:"insert,update"`
+	IsAtivo      bool   `db:"is_ativo" repo:"insert,update"`
+	Email        string `db:"email" repo:"insert,update"`
 }
 
 type EmpresaDTO struct {

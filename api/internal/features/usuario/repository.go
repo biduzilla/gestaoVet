@@ -3,7 +3,6 @@ package usuario
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"gestaoVet/internal/core/contexts"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
@@ -134,57 +133,73 @@ func (r *usuarioRepository) Insert(
 	tx *sql.Tx,
 	model *Usuario,
 ) error {
-	query := `
-	insert into usuarios (
-		nome,
-		telefone,
-		email,
-		password_hash,
-		cnpj,
-		roles
-	)
-	values (
-		:nome,
-		:telefone,
-		:email,
-		:senha,
-		:cnpj,
-		:roles
-	)
-	returning
-		id,
-		created_at,
-		version
-	`
+	user := contexts.ContextGetUser(ctx)
 
-	params := map[string]any{
-		"nome":     model.Nome,
-		"telefone": model.Telefone,
-		"cnpj":     model.Cnpj,
-		"email":    model.Email,
-		"senha":    model.Senha.Hash,
-		"roles":    model.Roles,
-	}
-
-	query, args := repository.NamedQuery(query, params)
-
-	r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	err := tx.QueryRowContext(ctx, query, args...).Scan(
-		&model.ID,
-		&model.CreatedAt,
-		&model.Version,
+	err := r.baseRepository.Insert(
+		ctx,
+		tx,
+		model,
+		repository.WithExtraWhere("", map[string]any{
+			"cnpj":      model.Cnpj,
+			"createdBy": user.GetID(),
+		}),
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return e.ErrRecordNotFound
-		}
-
 		return parseUserConstraintError(err)
 	}
-
 	return nil
+	// query := `
+	// insert into usuarios (
+	// 	nome,
+	// 	telefone,
+	// 	email,
+	// 	password_hash,
+	// 	cnpj,
+	// 	roles
+	// )
+	// values (
+	// 	:nome,
+	// 	:telefone,
+	// 	:email,
+	// 	:senha,
+	// 	:cnpj,
+	// 	:roles
+	// )
+	// returning
+	// 	id,
+	// 	created_at,
+	// 	version
+	// `
+
+	// params := map[string]any{
+	// 	"nome":     model.Nome,
+	// 	"telefone": model.Telefone,
+	// 	"cnpj":     model.Cnpj,
+	// 	"email":    model.Email,
+	// 	"senha":    model.Senha.Hash,
+	// 	"roles":    model.Roles,
+	// }
+
+	// query, args := repository.NamedQuery(query, params)
+
+	// r.logger.PrintInfo(utils.MinifySQL(query), nil)
+
+	// err := tx.QueryRowContext(ctx, query, args...).Scan(
+	// 	&model.ID,
+	// 	&model.CreatedAt,
+	// 	&model.Version,
+	// )
+
+	// if err != nil {
+	// 	if errors.Is(err, sql.ErrNoRows) {
+	// 		return e.ErrRecordNotFound
+	// 	}
+
+	// 	return parseUserConstraintError(err)
+	// }
+
+	// return nil
 }
 
 func (r *usuarioRepository) Update(
@@ -193,52 +208,69 @@ func (r *usuarioRepository) Update(
 	model *Usuario,
 ) error {
 	user := contexts.ContextGetUser(ctx)
-	query := `
-	update usuarios
-	set
-		nome = :nome,
-		telefone = :telefone,
-		email = :email,
-		updated_at = now(),
-		updated_by = :ID,
-		roles = :roles
-		version = usuarios.version + 1
-	where
-		id = :userId
-    	and cnpj = :cnpj
-		and version = :version
-		and deleted = false
-	returning
-		version
-	`
 
-	params := map[string]any{
-		"nome":     model.Nome,
-		"telefone": model.Telefone,
-		"cnpj":     user.GetCNPJ(),
-		"email":    model.Email,
-		"ID":       user.GetID(),
-		"version":  model.Version,
-		"roles":    model.Roles,
-		"userId":   model.ID,
-	}
-
-	query, args := repository.NamedQuery(query, params)
-	r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	err := tx.QueryRowContext(ctx, query, args...).Scan(
-		&model.Version,
+	err := r.baseRepository.Update(
+		ctx,
+		tx,
+		model,
+		model.ID,
+		repository.WithExtraWhere("AND cnpj = :cnpj", map[string]any{
+			"cnpj":      user.GetCNPJ(),
+			"updatedBy": user.GetID(),
+		}),
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return e.ErrEditConflict
-		}
-
 		return parseUserConstraintError(err)
 	}
-
 	return nil
+
+	// query := `
+	// update usuarios
+	// set
+	// 	nome = :nome,
+	// 	telefone = :telefone,
+	// 	email = :email,
+	// 	updated_at = now(),
+	// 	updated_by = :ID,
+	// 	roles = :roles
+	// 	version = usuarios.version + 1
+	// where
+	// 	id = :userId
+	// 	and cnpj = :cnpj
+	// 	and version = :version
+	// 	and deleted = false
+	// returning
+	// 	version
+	// `
+
+	// params := map[string]any{
+	// 	"nome":     model.Nome,
+	// 	"telefone": model.Telefone,
+	// 	"cnpj":     user.GetCNPJ(),
+	// 	"email":    model.Email,
+	// 	"ID":       user.GetID(),
+	// 	"version":  model.Version,
+	// 	"roles":    model.Roles,
+	// 	"userId":   model.ID,
+	// }
+
+	// query, args := repository.NamedQuery(query, params)
+	// r.logger.PrintInfo(utils.MinifySQL(query), nil)
+
+	// err := tx.QueryRowContext(ctx, query, args...).Scan(
+	// 	&model.Version,
+	// )
+
+	// if err != nil {
+	// 	if errors.Is(err, sql.ErrNoRows) {
+	// 		return e.ErrEditConflict
+	// 	}
+
+	// 	return parseUserConstraintError(err)
+	// }
+
+	// return nil
 }
 
 func (r *usuarioRepository) UpdateSenha(

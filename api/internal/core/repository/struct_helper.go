@@ -15,7 +15,7 @@ type FieldParam struct {
 func CollectParams(model any, mode string) ([]FieldParam, error) {
 	v := reflect.ValueOf(model)
 
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return nil, fmt.Errorf("model cannot be nil")
 		}
@@ -36,9 +36,17 @@ func CollectParams(model any, mode string) ([]FieldParam, error) {
 		dbTag := field.Tag.Get("db")
 		repoTag := field.Tag.Get("repo")
 
-		if dbTag == "" || dbTag == "-" {
+		if fieldVal.Kind() == reflect.Struct && dbTag == "-" {
+			nestedParams, err := collectNestedParams(fieldVal, mode)
+			if err == nil && len(nestedParams) > 0 {
+				params = append(params, nestedParams...)
+			}
 			continue
 		}
+
+		// if dbTag == "" || dbTag == "-" {
+		// 	continue
+		// }
 
 		if shouldSkipField(repoTag, mode) {
 			continue
@@ -53,6 +61,42 @@ func CollectParams(model any, mode string) ([]FieldParam, error) {
 		})
 	}
 
+	return params, nil
+}
+
+func collectNestedParams(v reflect.Value, mode string) ([]FieldParam, error) {
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil, nil
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("expected struct")
+	}
+
+	t := v.Type()
+	var params []FieldParam
+
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		fieldVal := v.Field(i)
+		dbTag := field.Tag.Get("db")
+		repoTag := field.Tag.Get("repo")
+
+		if dbTag == "" || dbTag == "-" {
+			continue
+		}
+		if shouldSkipField(repoTag, mode) {
+			continue
+		}
+
+		params = append(params, FieldParam{
+			Column: dbTag,
+			Value:  fieldVal.Interface(),
+			Tag:    repoTag,
+		})
+	}
 	return params, nil
 }
 

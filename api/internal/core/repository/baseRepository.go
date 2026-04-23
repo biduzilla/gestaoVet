@@ -52,7 +52,7 @@ type BaseRepository[T any] interface {
 	Count(ctx context.Context, query string, params map[string]any) (int64, error)
 	Exists(ctx context.Context, query string, params map[string]any) (bool, error)
 	Insert(ctx context.Context, tx *sql.Tx, model *T, opts ...MutationOption) error
-	Update(ctx context.Context, tx *sql.Tx, model *T, id uuid.UUID, opts ...MutationOption) error
+	Update(ctx context.Context, tx *sql.Tx, model *T, id any, opts ...MutationOption) error
 }
 
 type baseRepository[T any] struct {
@@ -280,7 +280,7 @@ func (r *baseRepository[T]) Update(
 	ctx context.Context,
 	tx *sql.Tx,
 	model *T,
-	id uuid.UUID,
+	id any,
 	opts ...MutationOption,
 ) error {
 	cfg := &mutationConfig{}

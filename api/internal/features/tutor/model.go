@@ -10,25 +10,25 @@ import (
 
 type Tutor struct {
 	models.BaseModelCnpj
-	ID          uuid.UUID
-	Nome        string `db:"nome"`
-	Celular     string `db:"celular"`
-	Sexo        string `db:"sexo"`
-	Nascimento  string `db:"nascimento"`
-	Identidade  string `db:"identidade"`
-	CPF         string `db:"cpf"`
-	Observacoes string `db:"observacoes"`
-	CEP         string `db:"cep"`
-	Endereco    string `db:"endereco"`
-	Bairro      string `db:"bairro"`
-	Cidade      string `db:"cidade"`
-	Telefone1   string `db:"telefone1"`
-	Telefone2   string `db:"telefone2"`
-	Email1      string `db:"email1"`
-	Email2      string `db:"email2"`
-	Numero      string `db:"numero"`
-	Complemento string `db:"complemento"`
-	Estado      string `db:"estado"`
+	ID          uuid.UUID `db:"id" repo:"auto"`
+	Nome        string    `db:"nome" repo:"insert,update"`
+	Celular     string    `db:"celular" repo:"insert,update"`
+	Sexo        string    `db:"sexo" repo:"insert,update"`
+	Nascimento  string    `db:"nascimento" repo:"insert,update"`
+	Identidade  string    `db:"identidade" repo:"insert,update"`
+	CPF         string    `db:"cpf" repo:"insert,update"`
+	Observacoes string    `db:"observacoes" repo:"insert,update"`
+	CEP         string    `db:"cep" repo:"insert,update"`
+	Endereco    string    `db:"endereco" repo:"insert,update"`
+	Bairro      string    `db:"bairro" repo:"insert,update"`
+	Cidade      string    `db:"cidade" repo:"insert,update"`
+	Telefone1   string    `db:"telefone1" repo:"insert,update"`
+	Telefone2   string    `db:"telefone2" repo:"insert,update"`
+	Email1      string    `db:"email1" repo:"insert,update"`
+	Email2      string    `db:"email2" repo:"insert,update"`
+	Numero      string    `db:"numero" repo:"insert,update"`
+	Complemento string    `db:"complemento" repo:"insert,update"`
+	Estado      string    `db:"estado" repo:"insert,update"`
 }
 
 type TutorDTO struct {

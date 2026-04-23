@@ -13,13 +13,13 @@ import (
 
 type Usuario struct {
 	models.BaseModelCnpj
-	ID       uuid.UUID `db:"id"`
-	Nome     string    `db:"nome"`
-	Telefone string    `db:"telefone"`
-	Email    string    `db:"email"`
-	Senha    password  `db:"-"`
-	IsAtivo  bool      `db:"is_ativo"`
-	Roles    []int32   `db:"roles"`
+	ID       uuid.UUID `db:"id" repo:"auto"`
+	Nome     string    `db:"nome" repo:"insert,update"`
+	Telefone string    `db:"telefone" repo:"insert,update"`
+	Email    string    `db:"email" repo:"insert,update"`
+	IsAtivo  bool      `db:"is_ativo" repo:"insert,update"`
+	Roles    []int32   `db:"roles" repo:"insert,update"`
+	Senha    password  `db:"-" repo:"-"`
 }
 
 type UsuarioDTO struct {
@@ -48,7 +48,7 @@ func (u *Usuario) IsAnonymous() bool {
 
 type password struct {
 	Plaintext *string
-	Hash      []byte `db:"password_hash"`
+	Hash      []byte `db:"password_hash" repo:"insert,update"`
 }
 
 func (m Usuario) toDTO() *UsuarioDTO {
