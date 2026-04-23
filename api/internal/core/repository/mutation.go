@@ -34,6 +34,12 @@ func WithExtraWhere(where string, params map[string]any) MutationOption {
 	}
 }
 
+func WithIgnoreFields(fields ...string) MutationOption {
+	return func(mc *mutationConfig) {
+		mc.ignoreFields = append(mc.ignoreFields, fields...)
+	}
+}
+
 type pkInfo struct {
 	columnName string
 	isAuto     bool
@@ -108,7 +114,7 @@ func (r *baseRepository[T]) Insert(
 		opt(cfg)
 	}
 
-	params, err := CollectParams(model, "insert")
+	params, err := CollectParams(model, "insert", cfg.ignoreFields...)
 	if err != nil {
 		return fmt.Errorf("collect params: %w", err)
 	}
@@ -191,7 +197,7 @@ func (r *baseRepository[T]) Update(
 		opt(cfg)
 	}
 
-	params, err := CollectParams(model, "update")
+	params, err := CollectParams(model, "update", cfg.ignoreFields...)
 	if err != nil {
 		return fmt.Errorf("collect params: %w", err)
 	}

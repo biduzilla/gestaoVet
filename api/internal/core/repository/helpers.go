@@ -19,7 +19,7 @@ type FieldParam struct {
 	Tag    string
 }
 
-func CollectParams(model any, mode string) ([]FieldParam, error) {
+func CollectParams(model any, mode string, ignoreFields ...string) ([]FieldParam, error) {
 	v := reflect.ValueOf(model)
 
 	if v.Kind() == reflect.Pointer {
@@ -42,6 +42,12 @@ func CollectParams(model any, mode string) ([]FieldParam, error) {
 
 		dbTag := field.Tag.Get("db")
 		repoTag := field.Tag.Get("repo")
+
+		for _, ignored := range ignoreFields {
+			if dbTag == ignored {
+				continue
+			}
+		}
 
 		if field.Anonymous && fieldVal.Kind() == reflect.Struct {
 			nestedParams, err := collectNestedParams(fieldVal, mode)
