@@ -3,13 +3,40 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/utils"
+	"maps"
+	"reflect"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
+
+type MutationOption func(*mutationConfig)
+
+type mutationConfig struct {
+	skipAudit    bool
+	ignoreFields []string
+	extraWhere   string
+	extraParams  map[string]any
+}
+
+func WithSkipAudit() MutationOption {
+	return func(mc *mutationConfig) { mc.skipAudit = true }
+}
+
+func WithExtraWhere(where string, params map[string]any) MutationOption {
+	return func(mc *mutationConfig) {
+		mc.extraWhere = where
+		mc.extraParams = params
+	}
+}
 
 type BaseRepository[T any] interface {
 	FindById(ctx context.Context, id any) (*T, error)
@@ -24,6 +51,8 @@ type BaseRepository[T any] interface {
 	DeleteByQuery(ctx context.Context, tx *sql.Tx, query string, params map[string]any) error
 	Count(ctx context.Context, query string, params map[string]any) (int64, error)
 	Exists(ctx context.Context, query string, params map[string]any) (bool, error)
+	Insert(ctx context.Context, tx *sql.Tx, model *T, opts ...MutationOption) error
+	Update(ctx context.Context, tx *sql.Tx, model *T, id uuid.UUID, opts ...MutationOption) error
 }
 
 type baseRepository[T any] struct {
@@ -192,4 +221,139 @@ func (r *baseRepository[T]) selectColumns() string {
 func (r *baseRepository[T]) factory() *T {
 	var model T
 	return &model
+}
+
+func (r *baseRepository[T]) Insert(
+	ctx context.Context,
+	tx *sql.Tx,
+	model *T,
+	opts ...MutationOption,
+) error {
+	cfg := &mutationConfig{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	params, err := CollectParams(model, "insert")
+	if err != nil {
+		return fmt.Errorf("collect params: %w", err)
+	}
+
+	values := ParamsToMap(params)
+	maps.Copy(values, cfg.extraParams)
+
+	if !cfg.skipAudit {
+		values["created_at"] = time.Now()
+	}
+
+	query := BuildInsertQuery(r.table, params, []string{"id", "created_at", "version"})
+	queryStr, args := NamedQuery(query, values)
+	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
+
+	type returning struct {
+		ID        uuid.UUID `db:"id"`
+		CreatedAt time.Time `db:"created_at"`
+		Version   int       `db:"version"`
+	}
+	var ret returning
+
+	err = tx.QueryRowContext(ctx, queryStr, args...).Scan(
+		&ret.ID,
+		&ret.CreatedAt,
+		&ret.Version,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return e.ErrRecordNotFound
+		}
+		return parseConstraintError(err)
+	}
+
+	r.setFieldValue(model, "ID", ret.ID)
+	r.setFieldValue(model, "CreatedAt", ret.CreatedAt)
+	r.setFieldValue(model, "Version", ret.Version)
+
+	return nil
+}
+
+func (r *baseRepository[T]) Update(
+	ctx context.Context,
+	tx *sql.Tx,
+	model *T,
+	id uuid.UUID,
+	opts ...MutationOption,
+) error {
+	cfg := &mutationConfig{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	params, err := CollectParams(model, "update")
+	if err != nil {
+		return fmt.Errorf("collect params: %w", err)
+	}
+
+	values := ParamsToMap(params)
+	values["id"] = id
+
+	maps.Copy(values, cfg.extraParams)
+
+	if !cfg.skipAudit {
+		values["updated_at"] = time.Now()
+	}
+
+	extraWhere := cfg.extraWhere
+	if extraWhere != "" {
+		extraWhere += " AND version = :version"
+	} else {
+		extraWhere = "version = :version"
+	}
+	values["version"] = r.getFieldValue(model, "Version")
+
+	query := BuildUpdateQuery(r.table, params, "id", extraWhere, []string{"version"})
+	queryStr, args := NamedQuery(query, values)
+	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
+
+	var newVersion int
+	err = tx.QueryRowContext(ctx, queryStr, args...).Scan(&newVersion)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return e.ErrEditConflict
+		}
+		return parseConstraintError(err)
+	}
+
+	r.setFieldValue(model, "Version", newVersion)
+
+	return nil
+}
+
+func (r *baseRepository[T]) setFieldValue(
+	model *T,
+	fieldName string,
+	value any,
+) {
+	v := reflect.ValueOf(model).Elem()
+	field := v.FieldByName(fieldName)
+	if field.IsValid() && field.CanSet() {
+		field.Set(reflect.ValueOf(value))
+	}
+}
+
+func (r *baseRepository[T]) getFieldValue(model *T, fieldName string) any {
+	v := reflect.ValueOf(model).Elem()
+	field := v.FieldByName(fieldName)
+	if field.IsValid() {
+		return field.Interface()
+	}
+	return nil
+}
+
+func parseConstraintError(err error) error {
+	if pqErr, ok := err.(*pq.Error); ok {
+		if strings.Contains(pqErr.Constraint, "_key") {
+			return e.ValidationAlreadyExists("campo")
+		}
+	}
+	return err
 }
