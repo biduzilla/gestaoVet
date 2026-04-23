@@ -50,6 +50,7 @@ func NewRouter(
 		empresa:    empresa.NewRouter(h.Empresa, m),
 		auth:       auth.NewRouter(h.Auth, m),
 		tutor:      tutor.NewRouter(h.Tutor, m),
+		usuario:    usuario.NewRouter(h.Usuario, m),
 	}, nil
 }
 

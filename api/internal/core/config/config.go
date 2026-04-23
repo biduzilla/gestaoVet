@@ -2,6 +2,7 @@ package config
 
 import (
 	"log"
+	"time"
 
 	"github.com/joeshaw/envdecode"
 )
@@ -9,7 +10,7 @@ import (
 type Config struct {
 	Server struct {
 		Port    int
-		Timeout int
+		Timeout time.Duration
 	}
 	Env string
 	DB  struct {
@@ -40,9 +41,9 @@ type Conf struct {
 }
 
 type ConfServer struct {
-	Port    int  `env:"SERVER_PORT,required"`
-	Debug   bool `env:"SERVER_DEBUG,required"`
-	Timeout int  `env:"SERVER_TIMEOUT,required"`
+	Port    int           `env:"SERVER_PORT,required"`
+	Debug   bool          `env:"SERVER_DEBUG,required"`
+	Timeout time.Duration `env:"SERVER_TIMEOUT,required"`
 }
 
 type ConfDB struct {

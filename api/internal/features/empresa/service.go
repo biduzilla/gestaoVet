@@ -64,6 +64,7 @@ func (s *empresaService) Save(
 			return errors.NewValidationError(v.Errors)
 		}
 
+		model.IsAtivo = true
 		err := s.repository.Insert(ctx, tx, model)
 		if err != nil {
 			return err
@@ -109,7 +110,8 @@ func (s *empresaService) createUserAdmin(
 		BaseModelCnpj: models.BaseModelCnpj{
 			Cnpj: model.Cnpj,
 		},
-		Roles: []int32{int32(interfaces.ROLE_ADMIN)},
+		IsAtivo: true,
+		Roles:   []int32{int32(interfaces.ROLE_ADMIN)},
 	}
 	user.Senha.Set(model.Cnpj)
 	return s.usuarioService.Save(ctx, &user, tx)

@@ -8,7 +8,7 @@ import (
 
 type BaseModel struct {
 	Version   int        `db:"version" repo:"version"`
-	Deleted   bool       `db:"deleted" repo:"noupdate"`
+	Deleted   bool       `db:"deleted" repo:"auto"`
 	CreatedAt time.Time  `db:"created_at" repo:"auto"`
 	CreatedBy *uuid.UUID `db:"created_by" repo:"auto"`
 	UpdatedAt *time.Time `db:"updated_at" repo:"auto"`

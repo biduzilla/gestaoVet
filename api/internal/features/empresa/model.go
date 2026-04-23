@@ -8,11 +8,11 @@ import (
 
 type Empresa struct {
 	models.BaseModel
-	Cnpj         string `db:"cnpj" repo:"insert,noupdate"`
+	Cnpj         string `db:"cnpj" repo:"pk,insert,noupdate"`
 	NomeFantasia string `db:"nome_fantasia" repo:"insert,update"`
 	RazaoSocial  string `db:"razao_social" repo:"insert,update"`
 	Telefone     string `db:"telefone" repo:"insert,update"`
-	IsAtivo      bool   `db:"is_ativo" repo:"insert,update"`
+	IsAtivo      bool   `db:"is_ativo" repo:"insert,noupdate"`
 	Email        string `db:"email" repo:"insert,update"`
 }
 

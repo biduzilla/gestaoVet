@@ -176,16 +176,12 @@ func (r *empresaRepository) Update(
 	tx *sql.Tx,
 	model *Empresa,
 ) error {
-	user := contexts.ContextGetUser(ctx)
-
 	err := r.baseRepository.Update(
 		ctx,
 		tx,
 		model,
 		model.Cnpj,
-		repository.WithExtraWhere("AND deleted = false", map[string]any{
-			"updatedBy": user.GetID(),
-		}),
+		repository.WithExtraWhere("AND deleted = false", nil),
 	)
 
 	if err != nil {

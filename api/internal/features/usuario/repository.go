@@ -133,16 +133,10 @@ func (r *usuarioRepository) Insert(
 	tx *sql.Tx,
 	model *Usuario,
 ) error {
-	user := contexts.ContextGetUser(ctx)
-
 	err := r.baseRepository.Insert(
 		ctx,
 		tx,
 		model,
-		repository.WithExtraWhere("", map[string]any{
-			"cnpj":      model.Cnpj,
-			"createdBy": user.GetID(),
-		}),
 	)
 
 	if err != nil {
@@ -215,8 +209,7 @@ func (r *usuarioRepository) Update(
 		model,
 		model.ID,
 		repository.WithExtraWhere("AND cnpj = :cnpj", map[string]any{
-			"cnpj":      user.GetCNPJ(),
-			"updatedBy": user.GetID(),
+			"cnpj": user.GetCNPJ(),
 		}),
 	)
 
