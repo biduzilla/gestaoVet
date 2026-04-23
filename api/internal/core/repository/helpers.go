@@ -8,6 +8,7 @@ import (
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/lib/pq"
@@ -43,10 +44,10 @@ func CollectParams(model any, mode string, ignoreFields ...string) ([]FieldParam
 		dbTag := field.Tag.Get("db")
 		repoTag := field.Tag.Get("repo")
 
-		for _, ignored := range ignoreFields {
-			if dbTag == ignored {
-				continue
-			}
+		shouldIgnore := slices.Contains(ignoreFields, dbTag)
+
+		if shouldIgnore {
+			continue
 		}
 
 		if field.Anonymous && fieldVal.Kind() == reflect.Struct {
