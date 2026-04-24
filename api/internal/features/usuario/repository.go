@@ -3,6 +3,7 @@ package usuario
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"gestaoVet/internal/core/contexts"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
@@ -92,7 +93,10 @@ func (r *usuarioRepository) FindByEmail(
 	ctx context.Context,
 	email string,
 ) (*Usuario, error) {
-	return r.baseRepository.FindOne(ctx, "u.email = :email", map[string]any{"email": email})
+	return r.baseRepository.FindOne(
+		ctx,
+		repository.WithQueryExtraWhere("u.email = :email", map[string]any{"email": email}),
+	)
 }
 
 func (r *usuarioRepository) FindByID(
@@ -104,7 +108,10 @@ func (r *usuarioRepository) FindByID(
 		"id":   ID,
 		"cnpj": user.GetCNPJ(),
 	}
-	return r.baseRepository.FindOne(ctx, "u.id = :id and u.cnpj = :cnpj", params)
+	return r.baseRepository.FindOne(
+		ctx,
+		repository.WithQueryExtraWhere("u.id = :id and u.cnpj = :cnpj", params),
+	)
 }
 
 func (r *usuarioRepository) FindAll(
@@ -118,14 +125,16 @@ func (r *usuarioRepository) FindAll(
 		"telefone": telefone,
 		"email":    email,
 	}
-	query := `
-			(to_tsvector('simple', u.nome) @@ plainto_tsquery('simple', :nome) OR :nome = '')
-            and (to_tsvector('simple', u.telefone) @@ plainto_tsquery('simple', :telefone) OR :telefone = '')
-            and (to_tsvector('simple', u.email) @@ plainto_tsquery('simple', :email) OR :email = '') 
-			and u.deleted = false
+	query := fmt.Sprintf(`
+			%s
 			and u.cnpj = :cnpj
-	`
-	return r.baseRepository.FindWithFilters(ctx, f, query, params)
+	`, repository.BuildFilterQuery("u", nome, telefone, email, cnpj))
+
+	return r.baseRepository.FindWithFilters(
+		ctx,
+		f,
+		repository.WithQueryExtraWhere(query, params),
+	)
 }
 
 func (r *usuarioRepository) Insert(
@@ -143,57 +152,6 @@ func (r *usuarioRepository) Insert(
 		return parseUserConstraintError(err)
 	}
 	return nil
-	// query := `
-	// insert into usuarios (
-	// 	nome,
-	// 	telefone,
-	// 	email,
-	// 	password_hash,
-	// 	cnpj,
-	// 	roles
-	// )
-	// values (
-	// 	:nome,
-	// 	:telefone,
-	// 	:email,
-	// 	:senha,
-	// 	:cnpj,
-	// 	:roles
-	// )
-	// returning
-	// 	id,
-	// 	created_at,
-	// 	version
-	// `
-
-	// params := map[string]any{
-	// 	"nome":     model.Nome,
-	// 	"telefone": model.Telefone,
-	// 	"cnpj":     model.Cnpj,
-	// 	"email":    model.Email,
-	// 	"senha":    model.Senha.Hash,
-	// 	"roles":    model.Roles,
-	// }
-
-	// query, args := repository.NamedQuery(query, params)
-
-	// r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	// err := tx.QueryRowContext(ctx, query, args...).Scan(
-	// 	&model.ID,
-	// 	&model.CreatedAt,
-	// 	&model.Version,
-	// )
-
-	// if err != nil {
-	// 	if errors.Is(err, sql.ErrNoRows) {
-	// 		return e.ErrRecordNotFound
-	// 	}
-
-	// 	return parseUserConstraintError(err)
-	// }
-
-	// return nil
 }
 
 func (r *usuarioRepository) Update(
@@ -208,7 +166,7 @@ func (r *usuarioRepository) Update(
 		tx,
 		model,
 		model.ID,
-		repository.WithExtraWhere("AND cnpj = :cnpj", map[string]any{
+		repository.WithExtraWhere("AND u.cnpj = :cnpj", map[string]any{
 			"cnpj": user.GetCNPJ(),
 		}),
 	)
@@ -217,53 +175,6 @@ func (r *usuarioRepository) Update(
 		return parseUserConstraintError(err)
 	}
 	return nil
-
-	// query := `
-	// update usuarios
-	// set
-	// 	nome = :nome,
-	// 	telefone = :telefone,
-	// 	email = :email,
-	// 	updated_at = now(),
-	// 	updated_by = :ID,
-	// 	roles = :roles
-	// 	version = usuarios.version + 1
-	// where
-	// 	id = :userId
-	// 	and cnpj = :cnpj
-	// 	and version = :version
-	// 	and deleted = false
-	// returning
-	// 	version
-	// `
-
-	// params := map[string]any{
-	// 	"nome":     model.Nome,
-	// 	"telefone": model.Telefone,
-	// 	"cnpj":     user.GetCNPJ(),
-	// 	"email":    model.Email,
-	// 	"ID":       user.GetID(),
-	// 	"version":  model.Version,
-	// 	"roles":    model.Roles,
-	// 	"userId":   model.ID,
-	// }
-
-	// query, args := repository.NamedQuery(query, params)
-	// r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	// err := tx.QueryRowContext(ctx, query, args...).Scan(
-	// 	&model.Version,
-	// )
-
-	// if err != nil {
-	// 	if errors.Is(err, sql.ErrNoRows) {
-	// 		return e.ErrEditConflict
-	// 	}
-
-	// 	return parseUserConstraintError(err)
-	// }
-
-	// return nil
 }
 
 func (r *usuarioRepository) UpdateSenha(
@@ -333,5 +244,9 @@ func (r *usuarioRepository) Delete(
 		id = :id
 		and cnpj = :cnpj
 	`
-	return r.baseRepository.DeleteByQuery(ctx, tx, query, params)
+	return r.baseRepository.DeleteByQuery(
+		ctx,
+		tx,
+		repository.WithQueryExtraWhere(query, params),
+	)
 }

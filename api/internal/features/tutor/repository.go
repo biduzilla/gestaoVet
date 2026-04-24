@@ -79,15 +79,19 @@ func (r *tutorRepository) FindByID(
 	ID uuid.UUID,
 ) (*Tutor, error) {
 	user := contexts.ContextGetUser(ctx)
+	where := `
+		t.id = :id 
+		and t.cnpj = :cnpj
+	`
 	params := map[string]any{
 		"id":   ID,
 		"cnpj": user.GetCNPJ(),
 	}
 
-	return r.baseRepository.FindOne(ctx, `
-		t.id = :id 
-		and t.cnpj = :cnpj
-	`, params)
+	return r.baseRepository.FindOne(
+		ctx,
+		repository.WithQueryExtraWhere(where, params),
+	)
 }
 
 func (r *tutorRepository) FindAll(
@@ -115,7 +119,7 @@ func (r *tutorRepository) FindAll(
 			and t.cnpj = :cnpj
 	`
 
-	return r.baseRepository.FindWithFilters(ctx, f, query, params)
+	return r.baseRepository.FindWithFilters(ctx, f, repository.WithQueryExtraWhere(query, params))
 }
 
 func (r *tutorRepository) Insert(
@@ -139,97 +143,6 @@ func (r *tutorRepository) Insert(
 		return parseTutorConstraintError(err)
 	}
 	return nil
-	// query := `
-	// insert into tutores (
-	// 	nome,
-	// 	celular,
-	// 	sexo,
-	// 	nascimento,
-	// 	identidade,
-	// 	cpf,
-	// 	observacoes,
-	// 	cep,
-	// 	endereco,
-	// 	bairro,
-	// 	cidade,
-	// 	telefone1,
-	// 	telefone2,
-	// 	email1,
-	// 	email2,
-	// 	numero,
-	// 	complemento,
-	// 	estado,
-	// 	cnpj,
-	// 	created_by
-	// )
-	// values (
-	// 	:nome,
-	// 	:celular,
-	// 	:sexo,
-	// 	:nascimento,
-	// 	:identidade,
-	// 	:cpf,
-	// 	:observacoes,
-	// 	:cep,
-	// 	:endereco,
-	// 	:bairro,
-	// 	:cidade,
-	// 	:telefone1,
-	// 	:telefone2,
-	// 	:email1,
-	// 	:email2,
-	// 	:numero,
-	// 	:complemento,
-	// 	:estado,
-	// 	:cnpj,
-	// 	:createdBy
-	// )
-	// returning
-	// 	id,
-	// 	created_at,
-	// 	version
-	// `
-
-	// params := map[string]any{
-	// 	"nome":        model.Nome,
-	// 	"celular":     model.Celular,
-	// 	"sexo":        model.Sexo,
-	// 	"nascimento":  model.Nascimento,
-	// 	"identidade":  model.Identidade,
-	// 	"cpf":         model.CPF,
-	// 	"observacoes": model.Observacoes,
-	// 	"cep":         model.CEP,
-	// 	"endereco":    model.Endereco,
-	// 	"bairro":      model.Bairro,
-	// 	"cidade":      model.Cidade,
-	// 	"telefone1":   model.Telefone1,
-	// 	"telefone2":   model.Telefone2,
-	// 	"email1":      model.Email1,
-	// 	"email2":      model.Email2,
-	// 	"numero":      model.Numero,
-	// 	"complemento": model.Complemento,
-	// 	"estado":      model.Estado,
-	// 	"cnpj":        model.Cnpj,
-	// 	"createdBy":   user.GetID(),
-	// }
-
-	// query, args := repository.NamedQuery(query, params)
-
-	// err := tx.QueryRowContext(ctx, query, args...).Scan(
-	// 	&model.ID,
-	// 	&model.CreatedAt,
-	// 	&model.Version,
-	// )
-
-	// if err != nil {
-	// 	if errors.Is(err, sql.ErrNoRows) {
-	// 		return e.ErrRecordNotFound
-	// 	}
-
-	// 	return parseTutorConstraintError(err)
-	// }
-
-	// return nil
 }
 
 func (r *tutorRepository) Update(
@@ -244,7 +157,7 @@ func (r *tutorRepository) Update(
 		tx,
 		model,
 		model.ID,
-		repository.WithExtraWhere("and cnpj = :cnpj", map[string]any{
+		repository.WithExtraWhere("and t.cnpj = :cnpj", map[string]any{
 			"cnpj":      user.GetCNPJ(),
 			"updatedBy": user.GetID(),
 		}),
@@ -254,81 +167,6 @@ func (r *tutorRepository) Update(
 		return parseTutorConstraintError(err)
 	}
 	return nil
-	// query := `
-	// update tutores
-	// set
-	// 	nome = :nome,
-	// 	celular = :celular,
-	// 	sexo = :sexo,
-	// 	nascimento = :nascimento,
-	// 	identidade = :identidade,
-	// 	cpf = :cpf,
-	// 	observacoes = :observacoes,
-	// 	cep = :cep,
-	// 	endereco = :endereco,
-	// 	bairro = :bairro,
-	// 	cidade = :cidade,
-	// 	telefone1 = :telefone1,
-	// 	telefone2 = :telefone2,
-	// 	email1 = :email1,
-	// 	email2 = :email2,
-	// 	numero = :numero,
-	// 	complemento = :complemento,
-	// 	estado = :estado,
-	// 	updated_at = now(),
-	// 	updated_by = :ID,
-	// 	version = tutores.version + 1
-	// where
-	// 	id = :tutorId
-	// 	and cnpj = :cnpj
-	// 	and version = :version
-	// 	and deleted = false
-	// returning
-	// 	version
-	// `
-
-	// params := map[string]any{
-	// 	"nome":        model.Nome,
-	// 	"celular":     model.Celular,
-	// 	"sexo":        model.Sexo,
-	// 	"nascimento":  model.Nascimento,
-	// 	"identidade":  model.Identidade,
-	// 	"cpf":         model.CPF,
-	// 	"observacoes": model.Observacoes,
-	// 	"cep":         model.CEP,
-	// 	"endereco":    model.Endereco,
-	// 	"bairro":      model.Bairro,
-	// 	"cidade":      model.Cidade,
-	// 	"telefone1":   model.Telefone1,
-	// 	"telefone2":   model.Telefone2,
-	// 	"email1":      model.Email1,
-	// 	"email2":      model.Email2,
-	// 	"numero":      model.Numero,
-	// 	"complemento": model.Complemento,
-	// 	"estado":      model.Estado,
-	// 	"cnpj":        user.GetCNPJ(),
-	// 	"ID":          user.GetID(),
-	// 	"version":     model.Version,
-	// 	"tutorId":     model.ID,
-	// }
-
-	// query, args := repository.NamedQuery(query, params)
-
-	// r.logger.PrintInfo(utils.MinifySQL(query), nil)
-
-	// err := tx.QueryRowContext(ctx, query, args...).Scan(
-	// 	&model.Version,
-	// )
-
-	// if err != nil {
-	// 	if errors.Is(err, sql.ErrNoRows) {
-	// 		return e.ErrEditConflict
-	// 	}
-
-	// 	return parseTutorConstraintError(err)
-	// }
-
-	// return nil
 }
 
 func (r *tutorRepository) DeleteByID(
@@ -338,14 +176,13 @@ func (r *tutorRepository) DeleteByID(
 ) error {
 	user := contexts.ContextGetUser(ctx)
 	params := map[string]any{
-		"id":     ID,
-		"userID": user.GetID(),
-		"cnpj":   user.GetCNPJ(),
+		"id":   ID,
+		"cnpj": user.GetCNPJ(),
 	}
 
 	query := `
-		id = :id
-		and cnpj = :cnpj
+		t.id = :id
+		and t.cnpj = :cnpj
 	`
-	return r.baseRepository.DeleteByQuery(ctx, tx, query, params)
+	return r.baseRepository.DeleteByQuery(ctx, tx, repository.WithQueryExtraWhere(query, params))
 }

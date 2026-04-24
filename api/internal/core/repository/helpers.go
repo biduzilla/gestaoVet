@@ -86,7 +86,7 @@ func CollectParams(model any, mode string, ignoreFields ...string) ([]FieldParam
 }
 
 func collectNestedParams(v reflect.Value, mode string) ([]FieldParam, error) {
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return nil, nil
 		}
@@ -105,7 +105,6 @@ func collectNestedParams(v reflect.Value, mode string) ([]FieldParam, error) {
 		dbTag := field.Tag.Get("db")
 		repoTag := field.Tag.Get("repo")
 
-		// ✅ Recursa em embedded structs dentro de nested structs também
 		if field.Anonymous && fieldVal.Kind() == reflect.Struct {
 			nested, err := collectNestedParams(fieldVal, mode)
 			if err == nil && len(nested) > 0 {
@@ -240,7 +239,7 @@ func BuildUpdateQuery(
 
 	where := fmt.Sprintf("%s = :%s AND deleted = false", pkColumn, pkColumn)
 	if extraWhere != "" {
-		where += " " + extraWhere
+		where += " and " + extraWhere
 	}
 
 	if !cfg.skipAudit {
@@ -435,8 +434,8 @@ func collectColumns(t reflect.Type, alias string, cols *[]string) {
 		return
 	}
 
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
+	for field := range t.Fields() {
+		field := field
 
 		tag := field.Tag.Get("db")
 
@@ -536,4 +535,19 @@ func collectFields(dest any) ([]any, error) {
 	}
 
 	return fields, nil
+}
+
+func BuildFilterQuery(alias string, search ...string) string {
+	if len(search) == 0 {
+		return ""
+	}
+
+	var fields []string
+	for _, s := range search {
+		fields = append(fields, fmt.Sprintf("coalesce(%s.%s, '')", alias, s))
+	}
+
+	return fmt.Sprintf(`((:search is null or :search = '')
+	or to_tsvector('simple', %s) @@ plainto_tsquery('simple', :search))`,
+		strings.Join(fields, " || ' ' || "))
 }

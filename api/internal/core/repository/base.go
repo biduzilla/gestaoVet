@@ -4,28 +4,28 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"gestaoVet/internal/core/contexts"
 	e "gestaoVet/internal/core/domain/errors"
 	"gestaoVet/internal/core/filters"
 	"gestaoVet/internal/core/jsonlog"
 	"gestaoVet/utils"
+	"maps"
 	"reflect"
 	"strings"
 )
 
 type BaseRepository[T any] interface {
 	FindById(ctx context.Context, id any, opts ...QueryOption) (*T, error)
-	Find(ctx context.Context, query string, params map[string]any, opts ...QueryOption) ([]*T, error)
-	FindOne(ctx context.Context, query string, params map[string]any, opts ...QueryOption) (*T, error)
+	Find(ctx context.Context, opts ...QueryOption) ([]*T, error)
+	FindOne(ctx context.Context, opts ...QueryOption) (*T, error)
 	FindWithFilters(
 		ctx context.Context,
 		f filters.Filters,
-		query string,
-		params map[string]any,
 		opts ...QueryOption,
 	) ([]*T, filters.Metadata, error)
-	DeleteByQuery(ctx context.Context, tx *sql.Tx, query string, params map[string]any) error
-	Count(ctx context.Context, query string, params map[string]any) (int64, error)
-	Exists(ctx context.Context, query string, params map[string]any) (bool, error)
+	DeleteByQuery(ctx context.Context, tx *sql.Tx, opts ...QueryOption) error
+	Count(ctx context.Context, opts ...QueryOption) (int64, error)
+	Exists(ctx context.Context, opts ...QueryOption) (bool, error)
 	Insert(ctx context.Context, tx *sql.Tx, model *T, opts ...MutationOption) error
 	Update(ctx context.Context, tx *sql.Tx, model *T, id any, opts ...MutationOption) error
 }
@@ -52,11 +52,10 @@ func NewBaseRepository[T any](
 }
 
 type JoinSpec struct {
-	Model     any
-	Table     string
-	Alias     string
-	On        string
-	FieldName string
+	Model any
+	Table string
+	Alias string
+	On    string
 }
 
 type queryConfig struct {
@@ -67,22 +66,24 @@ type queryConfig struct {
 
 type QueryOption func(*queryConfig)
 
-func WithJoin(model any, table, alias, on, fieldName string) QueryOption {
+func WithJoin(model any, table, alias, on string) QueryOption {
 	return func(c *queryConfig) {
 		c.joins = append(c.joins, JoinSpec{
-			Model:     model,
-			Table:     table,
-			Alias:     alias,
-			On:        on,
-			FieldName: fieldName,
+			Model: model,
+			Table: table,
+			Alias: alias,
+			On:    on,
 		})
 	}
 }
 
-func WithExtraWhereQuery(where string, params map[string]any) QueryOption {
+func WithQueryExtraWhere(where string, params map[string]any) QueryOption {
 	return func(c *queryConfig) {
 		c.extraWhere = where
-		c.extraParams = params
+		if c.extraParams == nil {
+			c.extraParams = make(map[string]any)
+		}
+		maps.Copy(c.extraParams, params)
 	}
 }
 
@@ -94,20 +95,22 @@ func newQueryConfig(opts ...QueryOption) *queryConfig {
 	return cfg
 }
 
-func (r *baseRepository[T]) Exists(ctx context.Context, query string, params map[string]any) (bool, error) {
-	if strings.TrimSpace(query) == "" {
-		query = "1 = 1"
+func (r *baseRepository[T]) Exists(ctx context.Context, opts ...QueryOption) (bool, error) {
+	cfg := newQueryConfig(opts...)
+
+	if strings.TrimSpace(cfg.extraWhere) == "" {
+		cfg.extraWhere = "1 = 1"
 	}
 
 	queryStr := fmt.Sprintf(`
         SELECT EXISTS (
             SELECT 1 
             FROM %s 
-            WHERE %s AND deleted = false
+            WHERE %s AND %s.deleted = false
         )
-    `, r.table, query)
+    `, r.table, cfg.extraWhere, r.alias)
 
-	namedQuery, args := NamedQuery(queryStr, params)
+	namedQuery, args := NamedQuery(queryStr, cfg.extraParams)
 	r.logger.PrintInfo(utils.MinifySQL(namedQuery), nil)
 
 	var exists bool
@@ -127,19 +130,21 @@ func (r *baseRepository[T]) FindById(
 	from %s as %s
 	%s
 	where
-		id = $1
-		and deleted = false
-	`, r.selectColumns(cfg), r.table, r.alias, r.buildJoinClauses(cfg))
+		%s.id = :id
+		and %s
+		and %s.deleted = false
+	`, r.selectColumns(cfg), r.table, r.alias, r.buildJoinClauses(cfg), r.alias, cfg.extraWhere, r.alias)
 
+	cfg.extraParams["id"] = id
+
+	query, args := NamedQuery(query, cfg.extraParams)
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
 
-	return GetByQuery[T](ctx, r.db, query, []any{id})
+	return GetByQuery[T](ctx, r.db, query, args)
 }
 
 func (r *baseRepository[T]) Find(
 	ctx context.Context,
-	query string,
-	params map[string]any,
 	opts ...QueryOption,
 ) ([]*T, error) {
 	cfg := newQueryConfig(opts...)
@@ -150,10 +155,10 @@ func (r *baseRepository[T]) Find(
 	%s
 	where
 		%s
-		and deleted = false
-	`, r.selectColumns(cfg), r.table, r.alias, r.buildJoinClauses(cfg), query)
+		and %s.deleted = false
+	`, r.selectColumns(cfg), r.table, r.alias, r.buildJoinClauses(cfg), cfg.extraWhere, r.alias)
 
-	queryStr, args := NamedQuery(finalQuery, params)
+	queryStr, args := NamedQuery(finalQuery, cfg.extraParams)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
 
 	return ListQuery(ctx, r.db, queryStr, args, r.factory)
@@ -161,8 +166,6 @@ func (r *baseRepository[T]) Find(
 
 func (r *baseRepository[T]) FindOne(
 	ctx context.Context,
-	query string,
-	params map[string]any,
 	opts ...QueryOption,
 ) (*T, error) {
 	cfg := newQueryConfig(opts...)
@@ -173,24 +176,26 @@ func (r *baseRepository[T]) FindOne(
 	%s
 	where
 		%s
-		and deleted = false
+		and %s.deleted = false
 	limit 1
-	`, r.selectColumns(cfg), r.table, r.alias, r.buildJoinClauses(cfg), query)
+	`, r.selectColumns(cfg), r.table, r.alias, r.buildJoinClauses(cfg), cfg.extraWhere, r.alias)
 
-	queryStr, args := NamedQuery(finalQuery, params)
+	queryStr, args := NamedQuery(finalQuery, cfg.extraParams)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
 
 	return GetByQuery[T](ctx, r.db, queryStr, args)
 }
 
-func (r *baseRepository[T]) Count(ctx context.Context, query string, params map[string]any) (int64, error) {
+func (r *baseRepository[T]) Count(ctx context.Context, opts ...QueryOption) (int64, error) {
+	cfg := newQueryConfig(opts...)
+
 	finalQuery := fmt.Sprintf(`
         SELECT COUNT(*)
         FROM %s as %s
-        WHERE %s AND deleted = false
-    `, r.table, r.alias, query)
+        WHERE %s AND %s.deleted = false
+    `, r.table, r.alias, cfg.extraWhere, r.alias)
 
-	queryStr, args := NamedQuery(finalQuery, params)
+	queryStr, args := NamedQuery(finalQuery, cfg.extraParams)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
 
 	var count int64
@@ -201,8 +206,6 @@ func (r *baseRepository[T]) Count(ctx context.Context, query string, params map[
 func (r *baseRepository[T]) FindWithFilters(
 	ctx context.Context,
 	f filters.Filters,
-	query string,
-	params map[string]any,
 	opts ...QueryOption,
 ) ([]*T, filters.Metadata, error) {
 	cfg := newQueryConfig(opts...)
@@ -211,7 +214,7 @@ func (r *baseRepository[T]) FindWithFilters(
         SELECT COUNT(*) OVER(), %s
         FROM %s as %s
 		%s
-        WHERE %s AND deleted = false
+        WHERE %s AND %s.deleted = false
         ORDER BY %s %s
        	LIMIT :limit
         OFFSET :offset
@@ -220,21 +223,29 @@ func (r *baseRepository[T]) FindWithFilters(
 		r.table,
 		r.alias,
 		r.buildJoinClauses(cfg),
-		query,
+		cfg.extraWhere,
+		r.alias,
 		f.SortColumn(),
 		f.SortDirection(),
 	)
 
-	params["limit"] = f.Limit()
-	params["offset"] = f.Offset()
+	cfg.extraParams["limit"] = f.Limit()
+	cfg.extraParams["offset"] = f.Offset()
 
-	queryStr, args := NamedQuery(finalQuery, params)
+	queryStr, args := NamedQuery(finalQuery, cfg.extraParams)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
 
 	return PaginatedQuery(ctx, r.db, queryStr, args, f, r.factory)
 }
 
-func (r *baseRepository[T]) DeleteByQuery(ctx context.Context, tx *sql.Tx, query string, params map[string]any) error {
+func (r *baseRepository[T]) DeleteByQuery(
+	ctx context.Context,
+	tx *sql.Tx,
+	opts ...QueryOption,
+) error {
+	cfg := newQueryConfig(opts...)
+	user := contexts.ContextGetUser(ctx)
+
 	finalQuery := fmt.Sprintf(`
 	UPDATE %s set
 		deleted = true,
@@ -243,9 +254,11 @@ func (r *baseRepository[T]) DeleteByQuery(ctx context.Context, tx *sql.Tx, query
 	where 
 		%s
 		and deleted = false
-	`, r.table, query)
+	`, r.table, cfg.extraWhere)
 
-	queryStr, args := NamedQuery(finalQuery, params)
+	cfg.extraParams["userID"] = user.GetID()
+
+	queryStr, args := NamedQuery(finalQuery, cfg.extraParams)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
 
 	result, err := tx.ExecContext(ctx, queryStr, args...)
