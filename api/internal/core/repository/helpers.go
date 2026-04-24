@@ -200,6 +200,11 @@ func BuildInsertQuery(
 		placeholders = append(placeholders, ":created_by", ":created_at")
 	}
 
+	for _, f := range cfg.extraFields {
+		columns = append(columns, f)
+		placeholders = append(placeholders, ":"+f)
+	}
+
 	query := fmt.Sprintf(
 		"INSERT INTO %s (%s) VALUES (%s)",
 		table,
@@ -242,6 +247,10 @@ func BuildUpdateQuery(
 		setParts = append(setParts, "updated_at = :updated_at")
 		setParts = append(setParts, "updated_by = :updated_by")
 		setParts = append(setParts, "version = version + 1")
+	}
+
+	for _, f := range cfg.extraFields {
+		setParts = append(setParts, fmt.Sprintf("%s = :%s", f, f))
 	}
 
 	query := fmt.Sprintf(

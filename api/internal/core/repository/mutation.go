@@ -20,6 +20,7 @@ type mutationConfig struct {
 	skipAudit    bool
 	ignoreFields []string
 	extraWhere   string
+	extraFields  []string
 	extraParams  map[string]any
 }
 
@@ -30,7 +31,20 @@ func WithSkipAudit() MutationOption {
 func WithExtraWhere(where string, params map[string]any) MutationOption {
 	return func(mc *mutationConfig) {
 		mc.extraWhere = where
-		mc.extraParams = params
+		if mc.extraParams == nil {
+			mc.extraParams = make(map[string]any)
+		}
+		maps.Copy(mc.extraParams, params)
+	}
+}
+
+func WithExtraFields(fields []string, params map[string]any) MutationOption {
+	return func(mc *mutationConfig) {
+		mc.extraFields = fields
+		if mc.extraParams == nil {
+			mc.extraParams = make(map[string]any)
+		}
+		maps.Copy(mc.extraParams, params)
 	}
 }
 
@@ -74,7 +88,6 @@ func (r *baseRepository[T]) getPkInfo(model *T) (pkInfo, error) {
 
 func (r *baseRepository[T]) getPkInfoFromStruct(t reflect.Type) (pkInfo, error) {
 	for field := range t.Fields() {
-		field := field
 		repoTag := field.Tag.Get("repo")
 		dbTag := field.Tag.Get("db")
 
