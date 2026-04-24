@@ -49,7 +49,7 @@ func (h *tutorHandler) FindByAll(w http.ResponseWriter, r *http.Request) {
 
 	dtos := make([]*TutorDTO, 0, len(models))
 	for _, m := range models {
-		dtos = append(dtos, m.toDTO())
+		dtos = append(dtos, m.ToDTO())
 	}
 
 	handler.Respond(
@@ -80,7 +80,7 @@ func (h *tutorHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 	handler.Respond(
 		w, r,
 		http.StatusOK,
-		model.toDTO(),
+		model.ToDTO(),
 		nil,
 		h.errHandler,
 	)
@@ -100,7 +100,7 @@ func (h *tutorHandler) Save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.Respond(w, r, http.StatusCreated, model.toDTO(), nil, h.errHandler)
+	handler.Respond(w, r, http.StatusCreated, model.ToDTO(), nil, h.errHandler)
 }
 
 func (h *tutorHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +117,7 @@ func (h *tutorHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.Respond(w, r, http.StatusOK, model.toDTO(), nil, h.errHandler)
+	handler.Respond(w, r, http.StatusOK, model.ToDTO(), nil, h.errHandler)
 }
 
 func (h *tutorHandler) DeleteByID(w http.ResponseWriter, r *http.Request) {

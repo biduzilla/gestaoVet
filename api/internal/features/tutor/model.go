@@ -55,7 +55,7 @@ type TutorDTO struct {
 	Version     *int       `json:"version"`
 }
 
-func (t Tutor) toDTO() *TutorDTO {
+func (t Tutor) ToDTO() *TutorDTO {
 	return &TutorDTO{
 		ID:          &t.ID,
 		Nome:        &t.Nome,
