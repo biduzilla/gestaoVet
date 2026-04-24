@@ -406,9 +406,14 @@ func ScanStruct(row *sql.Row, dest any) error {
 	return nil
 }
 
-func SelectColumns(model any, tableAlias string) string {
+func SelectColumns(cfg *queryConfig, model any, tableAlias string) string {
 	cols := []string{}
 	collectColumns(reflect.TypeOf(model), tableAlias, &cols)
+
+	for _, join := range cfg.joins {
+		collectColumns(reflect.TypeOf(join.Model), join.Alias, &cols)
+	}
+
 	return strings.Join(cols, ", ")
 }
 
@@ -431,7 +436,7 @@ func collectColumns(t reflect.Type, alias string, cols *[]string) {
 		// }
 
 		if tag != "" && tag != "-" {
-			*cols = append(*cols, fmt.Sprintf("%s.%s", alias, tag))
+			*cols = append(*cols, fmt.Sprintf("%s.%s as %s_%s", alias, tag, alias, tag))
 		}
 
 		if field.Anonymous && field.Type.Kind() == reflect.Struct {

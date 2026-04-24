@@ -13,14 +13,15 @@ import (
 )
 
 type BaseRepository[T any] interface {
-	FindById(ctx context.Context, id any) (*T, error)
-	Find(ctx context.Context, query string, params map[string]any) ([]*T, error)
-	FindOne(ctx context.Context, query string, params map[string]any) (*T, error)
+	FindById(ctx context.Context, id any, opts ...QueryOption) (*T, error)
+	Find(ctx context.Context, query string, params map[string]any, opts ...QueryOption) ([]*T, error)
+	FindOne(ctx context.Context, query string, params map[string]any, opts ...QueryOption) (*T, error)
 	FindWithFilters(
 		ctx context.Context,
 		f filters.Filters,
 		query string,
 		params map[string]any,
+		opts ...QueryOption,
 	) ([]*T, filters.Metadata, error)
 	DeleteByQuery(ctx context.Context, tx *sql.Tx, query string, params map[string]any) error
 	Count(ctx context.Context, query string, params map[string]any) (int64, error)
@@ -50,6 +51,49 @@ func NewBaseRepository[T any](
 	}
 }
 
+type JoinSpec struct {
+	Model     any
+	Table     string
+	Alias     string
+	On        string
+	FieldName string
+}
+
+type queryConfig struct {
+	joins       []JoinSpec
+	extraWhere  string
+	extraParams map[string]any
+}
+
+type QueryOption func(*queryConfig)
+
+func WithJoin(model any, table, alias, on, fieldName string) QueryOption {
+	return func(c *queryConfig) {
+		c.joins = append(c.joins, JoinSpec{
+			Model:     model,
+			Table:     table,
+			Alias:     alias,
+			On:        on,
+			FieldName: fieldName,
+		})
+	}
+}
+
+func WithExtraWhereQuery(where string, params map[string]any) QueryOption {
+	return func(c *queryConfig) {
+		c.extraWhere = where
+		c.extraParams = params
+	}
+}
+
+func newQueryConfig(opts ...QueryOption) *queryConfig {
+	cfg := &queryConfig{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	return cfg
+}
+
 func (r *baseRepository[T]) Exists(ctx context.Context, query string, params map[string]any) (bool, error) {
 	if strings.TrimSpace(query) == "" {
 		query = "1 = 1"
@@ -71,28 +115,43 @@ func (r *baseRepository[T]) Exists(ctx context.Context, query string, params map
 	return exists, err
 }
 
-func (r *baseRepository[T]) FindById(ctx context.Context, id any) (*T, error) {
+func (r *baseRepository[T]) FindById(
+	ctx context.Context,
+	id any,
+	opts ...QueryOption,
+) (*T, error) {
+	cfg := newQueryConfig(opts...)
+
 	query := fmt.Sprintf(`
 	select %s
-	from %s
+	from %s as %s
+	%s
 	where
 		id = $1
 		and deleted = false
-	`, r.selectColumns(), r.table)
+	`, r.selectColumns(cfg), r.table, r.alias, r.buildJoinClauses(cfg))
 
 	r.logger.PrintInfo(utils.MinifySQL(query), nil)
 
 	return GetByQuery[T](ctx, r.db, query, []any{id})
 }
 
-func (r *baseRepository[T]) Find(ctx context.Context, query string, params map[string]any) ([]*T, error) {
+func (r *baseRepository[T]) Find(
+	ctx context.Context,
+	query string,
+	params map[string]any,
+	opts ...QueryOption,
+) ([]*T, error) {
+	cfg := newQueryConfig(opts...)
+
 	finalQuery := fmt.Sprintf(`
 	select %s
 	from %s as %s
+	%s
 	where
 		%s
 		and deleted = false
-	`, r.selectColumns(), r.table, r.alias, query)
+	`, r.selectColumns(cfg), r.table, r.alias, r.buildJoinClauses(cfg), query)
 
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
@@ -100,15 +159,23 @@ func (r *baseRepository[T]) Find(ctx context.Context, query string, params map[s
 	return ListQuery(ctx, r.db, queryStr, args, r.factory)
 }
 
-func (r *baseRepository[T]) FindOne(ctx context.Context, query string, params map[string]any) (*T, error) {
+func (r *baseRepository[T]) FindOne(
+	ctx context.Context,
+	query string,
+	params map[string]any,
+	opts ...QueryOption,
+) (*T, error) {
+	cfg := newQueryConfig(opts...)
+
 	finalQuery := fmt.Sprintf(`
 	select %s
 	from %s as %s
+	%s
 	where
 		%s
 		and deleted = false
 	limit 1
-	`, r.selectColumns(), r.table, r.alias, query)
+	`, r.selectColumns(cfg), r.table, r.alias, r.buildJoinClauses(cfg), query)
 
 	queryStr, args := NamedQuery(finalQuery, params)
 	r.logger.PrintInfo(utils.MinifySQL(queryStr), nil)
@@ -136,15 +203,26 @@ func (r *baseRepository[T]) FindWithFilters(
 	f filters.Filters,
 	query string,
 	params map[string]any,
+	opts ...QueryOption,
 ) ([]*T, filters.Metadata, error) {
+	cfg := newQueryConfig(opts...)
+
 	finalQuery := fmt.Sprintf(`
         SELECT COUNT(*) OVER(), %s
         FROM %s as %s
+		%s
         WHERE %s AND deleted = false
         ORDER BY %s %s
        	LIMIT :limit
         OFFSET :offset
-    `, r.selectColumns(), r.table, r.alias, query, f.SortColumn(), f.SortDirection(),
+    `,
+		r.selectColumns(cfg),
+		r.table,
+		r.alias,
+		r.buildJoinClauses(cfg),
+		query,
+		f.SortColumn(),
+		f.SortDirection(),
 	)
 
 	params["limit"] = f.Limit()
@@ -187,9 +265,9 @@ func (r *baseRepository[T]) DeleteByQuery(ctx context.Context, tx *sql.Tx, query
 	return nil
 }
 
-func (r *baseRepository[T]) selectColumns() string {
+func (r *baseRepository[T]) selectColumns(cfg *queryConfig) string {
 	var model T
-	return SelectColumns(model, r.alias)
+	return SelectColumns(cfg, model, r.alias)
 }
 
 func (r *baseRepository[T]) factory() *T {
@@ -216,4 +294,16 @@ func (r *baseRepository[T]) getFieldValue(model *T, fieldName string) any {
 		return field.Interface()
 	}
 	return nil
+}
+
+func (r *baseRepository[T]) buildJoinClauses(cfg *queryConfig) string {
+	if len(cfg.joins) == 0 {
+		return ""
+	}
+
+	var joins []string
+	for _, j := range cfg.joins {
+		joins = append(joins, fmt.Sprintf("LEFT JOIN %s %s ON %s", j.Table, j.Alias, j.On))
+	}
+	return "\n" + strings.Join(joins, "\n")
 }
