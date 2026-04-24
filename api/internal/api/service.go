@@ -7,6 +7,7 @@ import (
 	"gestaoVet/internal/core/transaction"
 	"gestaoVet/internal/features/auth"
 	"gestaoVet/internal/features/empresa"
+	"gestaoVet/internal/features/pet"
 	"gestaoVet/internal/features/tutor"
 	"gestaoVet/internal/features/usuario"
 )
@@ -16,6 +17,7 @@ type Services struct {
 	usuario.UsuarioService
 	auth.AuthService
 	tutor.TutorService
+	pet.PetService
 }
 
 func NewServices(db *sql.DB, logger jsonlog.Logger, config config.Config) (*Services, error) {
@@ -33,5 +35,6 @@ func NewServices(db *sql.DB, logger jsonlog.Logger, config config.Config) (*Serv
 		UsuarioService: usuarioService,
 		AuthService:    authService,
 		TutorService:   tutor.NewService(r.TutorRepository, tx),
+		PetService:     pet.NewService(r.PetReposistory, tx),
 	}, nil
 }
