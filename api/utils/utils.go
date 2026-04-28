@@ -101,6 +101,14 @@ func ConvertInt32ToRoles(rolesInt32 []int32) []interfaces.Role {
 	return roles
 }
 
+func ConvertRolesToInt32(roles []interfaces.Role) []int32 {
+	roles32 := make([]int32, len(roles))
+	for i, r := range roles32 {
+		roles[i] = interfaces.Role(r)
+	}
+	return roles32
+}
+
 func ValidateTelefone(telefone string) bool {
 	telefone = regexp.MustCompile(`[^\d]`).ReplaceAllString(telefone, "")
 

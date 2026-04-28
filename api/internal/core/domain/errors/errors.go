@@ -51,6 +51,9 @@ var (
 	ErrRecordNotFound           = errors.New("record not found")
 	ErrEditConflict             = errors.New("edit conflict")
 	ErrInvalidData              = errors.New("invalid data")
+	ErrTokenExpired             = errors.New("token has expired")
+	ErrInvalidTokenType         = errors.New("invalid token type for this operation")
+	ErrInvalidTokenClaims       = errors.New("token claims are invalid or malformed")
 	ErrInvalidCredentials       = errors.New("invalid authentication credentials")
 	ErrCountPermissions         = errors.New("one or more permissions do not exist")
 	ErrInactiveAccount          = errors.New("your user account must be activated to access this resource")
@@ -83,6 +86,9 @@ func (e *errorHandler) HandlerError(w http.ResponseWriter, r *http.Request, err 
 
 	case errors.Is(err, ErrInvalidCredentials):
 		e.InvalidCredentialsResponse(w, r)
+
+	case errors.Is(err, ErrInvalidTokenClaims):
+		e.InvalidTokenClaimsResponse(w, r)
 
 	default:
 		e.ServerErrorResponse(w, r, err)
@@ -126,6 +132,10 @@ func (e *errorHandler) RequestTimeoutResponse(w http.ResponseWriter, r *http.Req
 func (e *errorHandler) MalFormedTokenResponse(w http.ResponseWriter, r *http.Request) {
 	message := "malformed token"
 	e.errorHandler(w, r, http.StatusUnauthorized, message)
+}
+
+func (e *errorHandler) InvalidTokenClaimsResponse(w http.ResponseWriter, r *http.Request) {
+	e.errorHandler(w, r, http.StatusUnauthorized, ErrInvalidTokenClaims.Error())
 }
 
 func (e *errorHandler) ExpiredTokenResponse(w http.ResponseWriter, r *http.Request) {

@@ -21,12 +21,12 @@ import (
 	"github.com/google/uuid"
 )
 
-type authService struct {
-	usuarioService usuario.UsuarioService
-	config         config.Config
-	privateKey     *rsa.PrivateKey
-	publicKey      *rsa.PublicKey
-}
+const (
+	AccessTokenExpiration  = 15 * time.Minute
+	RefreshTokenExpiration = 7 * 24 * time.Hour
+	TokenIssuer            = "gestao-vet-api"
+	TokenAudience          = "gestao-vet-clients"
+)
 
 type TokenType string
 
@@ -35,16 +35,29 @@ const (
 	TokenTypeRefresh TokenType = "refresh"
 )
 
-type AuthService interface {
-	Login(
-		ctx context.Context,
-		email, password string,
-	) (string, string, uuid.UUID, error)
+type TokenClaims struct {
+	UserID   uuid.UUID `json:"user_id"`
+	Username string    `json:"username"`
+	CNPJ     string    `json:"cnpj"`
+	IsAtivo  bool      `json:"is_ativo"`
+	Roles    []int32   `json:"roles"`
+	Type     TokenType `json:"type"`
+	jwt.RegisteredClaims
+}
 
+type AuthService interface {
+	Login(ctx context.Context, email, password string) (accessToken, refreshToken string, userID uuid.UUID, err error)
 	ExtractAuthenticatedUser(tokenString string) (interfaces.User, error)
-	RefreshToken(refreshToken string) (string, error)
-	ValidateToken(tokenString string) (*jwt.Token, error)
+	RefreshToken(ctx context.Context, refreshToken string) (string, error)
+	ValidateToken(tokenString string, expectedType TokenType) (*TokenClaims, error)
 	GetPublicKey() *rsa.PublicKey
+}
+
+type authService struct {
+	usuarioService usuario.UsuarioService
+	config         config.Config
+	privateKey     *rsa.PrivateKey
+	publicKey      *rsa.PublicKey
 }
 
 func NewService(
@@ -57,59 +70,86 @@ func NewService(
 	}
 
 	if err := service.loadKeys(); err != nil {
-		return nil, fmt.Errorf("Failed to load RSA keys.: %w", err)
+		return nil, fmt.Errorf("failed to load RSA keys: %w", err)
 	}
 
 	return service, nil
 }
 
 func (s *authService) loadKeys() error {
-	privateKeyData, err := os.ReadFile(s.config.Security.PrivateKeyPath)
+	privateKey, err := loadRSAPrivateKey(s.config.Security.PrivateKeyPath)
 	if err != nil {
-		return fmt.Errorf("Error reading private key.: %w", err)
-	}
-
-	block, _ := pem.Decode(privateKeyData)
-	if block == nil {
-		return fmt.Errorf("Failure to decode private key PEM")
-	}
-
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		key, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
-		if err2 != nil {
-			return fmt.Errorf("Failed to parse private key.: %v / %v", err, err2)
-		}
-		var ok bool
-		privateKey, ok = key.(*rsa.PrivateKey)
-		if !ok {
-			return fmt.Errorf("The key is not RSA.")
-		}
+		return fmt.Errorf("failed to load private key: %w", err)
 	}
 	s.privateKey = privateKey
 
-	publicKeyData, err := os.ReadFile(s.config.Security.PublicKeyPath)
+	publicKey, err := loadRSAPublicKey(s.config.Security.PublicKeyPath)
 	if err != nil {
-		return fmt.Errorf("Error reading public key.: %w", err)
-	}
-
-	block, _ = pem.Decode(publicKeyData)
-	if block == nil {
-		return fmt.Errorf("Failure to decode public key PEM")
-	}
-
-	publicKeyInterface, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return fmt.Errorf("Failed to parse public key.: %w", err)
-	}
-
-	publicKey, ok := publicKeyInterface.(*rsa.PublicKey)
-	if !ok {
-		return fmt.Errorf("Public key is not RSA.")
+		return fmt.Errorf("failed to load public key: %w", err)
 	}
 	s.publicKey = publicKey
 
 	return nil
+}
+
+func loadRSAPrivateKey(path string) (*rsa.PrivateKey, error) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, fmt.Errorf("private key file not found: %s", path)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key file: %w", err)
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, errors.New("failed to decode PEM block containing private key")
+	}
+
+	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
+		return key, nil
+	}
+
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	rsaKey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("private key is not RSA")
+	}
+
+	return rsaKey, nil
+}
+
+func loadRSAPublicKey(path string) (*rsa.PublicKey, error) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, fmt.Errorf("public key file not found: %s", path)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read public key file: %w", err)
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, errors.New("failed to decode PEM block containing public key")
+	}
+
+	key, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	rsaKey, ok := key.(*rsa.PublicKey)
+	if !ok {
+		return nil, errors.New("public key is not RSA")
+	}
+
+	return rsaKey, nil
 }
 
 func (s *authService) Login(
@@ -117,9 +157,7 @@ func (s *authService) Login(
 	email, password string,
 ) (string, string, uuid.UUID, error) {
 	v := validator.New()
-
 	usuario.ValidatePasswordPlaintext(v, password)
-
 	if !v.Valid() {
 		return "", "", uuid.Nil, e.NewValidationError(v.Errors)
 	}
@@ -145,172 +183,134 @@ func (s *authService) Login(
 		return "", "", uuid.Nil, e.ErrInvalidCredentials
 	}
 
-	token, err := s.createAccessToken(user)
+	accessToken, err := s.createToken(user, TokenTypeAccess, AccessTokenExpiration)
 	if err != nil {
-		return "", "", uuid.Nil, err
+		return "", "", uuid.Nil, fmt.Errorf("failed to create access token: %w", err)
 	}
 
-	refreshToken, err := s.createRefreshToken(user)
+	refreshToken, err := s.createToken(user, TokenTypeRefresh, RefreshTokenExpiration)
 	if err != nil {
-		return "", "", uuid.Nil, err
+		return "", "", uuid.Nil, fmt.Errorf("failed to create refresh token: %w", err)
 	}
 
-	return token, refreshToken, user.ID, nil
+	return accessToken, refreshToken, user.ID, nil
 }
 
-func (s *authService) createAccessToken(user interfaces.User) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256,
-		jwt.MapClaims{
-			"username": user.GetUsername(),
-			"user_id":  user.GetID(),
-			"cnpj":     user.GetCNPJ(),
-			"is_ativo": user.GetIsAtivo(),
-			"roles":    user.GetRoles(),
-			"type":     TokenTypeAccess,
-			"exp":      time.Now().Add(7 * 24 * time.Hour).Unix(),
-			"iat":      time.Now().Unix(),
-		})
-	tokenStr, err := token.SignedString(s.privateKey)
-
-	if err != nil {
-		return "", err
+func (s *authService) createToken(
+	user interfaces.User,
+	tokenType TokenType,
+	expiration time.Duration,
+) (string, error) {
+	now := time.Now()
+	claims := TokenClaims{
+		UserID:   user.GetID(),
+		Username: user.GetUsername(),
+		CNPJ:     user.GetCNPJ(),
+		IsAtivo:  user.GetIsAtivo(),
+		Roles:    utils.ConvertRolesToInt32(user.GetRoles()),
+		Type:     tokenType,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(now.Add(expiration)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+			Issuer:    TokenIssuer,
+			Audience:  jwt.ClaimStrings{TokenAudience},
+			Subject:   user.GetID().String(),
+			ID:        uuid.New().String(),
+		},
 	}
 
-	return tokenStr, nil
-}
-
-func (s *authService) createRefreshToken(user interfaces.User) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256,
-		jwt.MapClaims{
-			"username": user.GetUsername(),
-			"user_id":  user.GetID(),
-			"cnpj":     user.GetCNPJ(),
-			"is_ativo": user.GetIsAtivo(),
-			"roles":    user.GetRoles(),
-			"type":     TokenTypeRefresh,
-			"exp":      time.Now().Add(7 * 24 * time.Hour).Unix(),
-			"iat":      time.Now().Unix(),
-		})
-
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	return token.SignedString(s.privateKey)
 }
 
-func (s *authService) ExtractAuthenticatedUser(token string) (interfaces.User, error) {
-	claims, ok, err := s.extractClaims(token)
-	if err != nil {
-		return nil, err
-	}
-
-	if !ok {
-		return nil, nil
-	}
-
-	userIDStr, ok := claims["user_id"].(string)
-	if !ok {
-		return nil, nil
-	}
-
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		return nil, fmt.Errorf("Invalid user_id: %w", err)
-	}
-
-	username, ok := claims["username"].(string)
-	if !ok {
-		return nil, nil
-	}
-
-	cnpj, ok := claims["cnpj"].(string)
-	if !ok {
-		return nil, nil
-	}
-
-	isAtivo, ok := claims["is_ativo"].(bool)
-	if !ok {
-		isAtivo = false
-	}
-
-	roles, err := s.getRolesFromClaims(claims)
-	if err != nil {
-		return nil, err
-	}
-
-	return models.NewAuthenticatedUser(userID, username, cnpj, isAtivo, utils.ConvertInt32ToRoles(roles)), nil
-
-}
-
-func (s *authService) extractClaims(tokenString string) (jwt.MapClaims, bool, error) {
-	token, err := s.ValidateToken(tokenString)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if !token.Valid {
-		return nil, false, nil
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, false, nil
-	}
-	return claims, true, nil
-}
-
-func (s *authService) getRolesFromClaims(claims jwt.MapClaims) ([]int32, error) {
-	var roles []int32
-	if rolesInterface, ok := claims["roles"]; ok {
-		switch v := rolesInterface.(type) {
-		case []any:
-			for _, r := range v {
-				if num, ok := r.(float64); ok {
-					roles = append(roles, int32(num))
-				}
+func (s *authService) ValidateToken(
+	tokenString string,
+	expectedType TokenType,
+) (*TokenClaims, error) {
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		&TokenClaims{},
+		func(t *jwt.Token) (any, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 			}
-		case []float64:
-			for _, r := range v {
-				roles = append(roles, int32(r))
-			}
-		default:
-			return []int32{}, fmt.Errorf("Invalid role format")
-		}
-
-	}
-
-	return roles, nil
-}
-
-func (s *authService) RefreshToken(refreshToken string) (string, error) {
-	token, err := s.ValidateToken(refreshToken)
-	if err != nil || !token.Valid {
-		return "", e.ErrInvalidCredentials
-	}
-
-	user, err := s.ExtractAuthenticatedUser(refreshToken)
-	if err != nil {
-		return "", err
-	}
-
-	return s.createAccessToken(user)
-}
-
-func (s *authService) ValidateToken(tokenString string) (*jwt.Token, error) {
-	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", t.Header["alg"])
-		}
-
-		return s.publicKey, nil
-	})
+			return s.publicKey, nil
+		},
+		jwt.WithIssuer(TokenIssuer),
+		jwt.WithAudience(TokenAudience),
+		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Name}),
+	)
 
 	if err != nil {
-		return nil, err
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return nil, e.ErrTokenExpired
+		}
+		if errors.Is(err, jwt.ErrTokenInvalidIssuer) || errors.Is(err, jwt.ErrTokenInvalidAudience) {
+			return nil, e.ErrInvalidTokenClaims
+		}
+		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
 
 	if !token.Valid {
 		return nil, e.ErrInvalidCredentials
 	}
 
-	return token, nil
+	claims, ok := token.Claims.(*TokenClaims)
+	if !ok {
+		return nil, e.ErrInvalidTokenClaims
+	}
+
+	if claims.Type != expectedType {
+		return nil, e.ErrInvalidTokenType
+	}
+
+	if !claims.IsAtivo {
+		return nil, e.ErrInactiveAccount
+	}
+
+	return claims, nil
+}
+
+func (s *authService) ExtractAuthenticatedUser(
+	tokenString string,
+) (interfaces.User, error) {
+	claims, err := s.ValidateToken(tokenString, TokenTypeAccess)
+	if err != nil {
+		return nil, err
+	}
+
+	return models.NewAuthenticatedUser(
+		claims.UserID,
+		claims.Username,
+		claims.CNPJ,
+		claims.IsAtivo,
+		utils.ConvertInt32ToRoles(claims.Roles),
+	), nil
+}
+
+func (s *authService) RefreshToken(
+	ctx context.Context,
+	refreshToken string,
+) (string, error) {
+	claims, err := s.ValidateToken(refreshToken, TokenTypeRefresh)
+	if err != nil {
+		return "", e.ErrInvalidCredentials
+	}
+
+	user, err := s.usuarioService.FindByEmail(ctx, claims.Username)
+	if err != nil {
+		if errors.Is(err, e.ErrRecordNotFound) {
+			return "", e.ErrInvalidCredentials
+		}
+		return "", err
+	}
+
+	if !user.IsAtivo {
+		return "", e.ErrInactiveAccount
+	}
+
+	return s.createToken(user, TokenTypeAccess, AccessTokenExpiration)
 }
 
 func (s *authService) GetPublicKey() *rsa.PublicKey {
